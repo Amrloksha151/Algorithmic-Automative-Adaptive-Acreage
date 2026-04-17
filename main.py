@@ -1,4 +1,12 @@
 from machine import Pin, PWM
 
-DATABASE_URL = "DATABASE_URL"
-GEMINI_API_KEY = "API_KEY"
+PINS = {
+    "pump": PWM(Pin(4), freq=...),
+    "cooling_fan": PWM(Pin(8), freq=...)
+}
+
+def main():
+    ...
+
+if __name__ == '__main__':
+    main()

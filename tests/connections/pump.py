@@ -1,7 +1,7 @@
 from machine import Pin
 from time import sleep
 
-PUMP = Pin(3, Pin.OUT)
+PUMP = Pin(4, Pin.OUT)
 
 while True:
     try:
