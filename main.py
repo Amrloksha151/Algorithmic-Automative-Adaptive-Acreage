@@ -1,0 +1,4 @@
+from machine import Pin, PWM
+
+DATABASE_URL = "DATABASE_URL"
+GEMINI_API_KEY = "API_KEY"
