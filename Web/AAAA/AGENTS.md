@@ -123,7 +123,7 @@ Apply a subtle noise grain overlay on `--bg-base` using an SVG filter or CSS `ba
 
 ### 3.1 TopBar
 
-**Left**: Leaf icon (Lucide `Leaf`, `--green-300`, 22px) + text `"GreenMind"` in `--font-display` size `1.2rem` color `--text-primary`
+**Left**: Leaf icon (Lucide `Leaf`, `--green-300`, 22px) + text `"Algorithmic Automative Adaptive Acreage"` in `--font-display` size `1.2rem` color `--text-primary`
 
 **Center**: `ConnectionStatusPill` component (see §3.10)
 
@@ -709,7 +709,7 @@ Full-screen overlay with a centered card, three steps:
 **Step 1 — Welcome**
 ```
         🌿
-   Welcome to GreenMind
+   Welcome to Algorithmic Automative Adaptive Acreage
 
    A smart greenhouse dashboard powered
    by AI. Let's get you connected.

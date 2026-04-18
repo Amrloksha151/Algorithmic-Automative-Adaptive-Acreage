@@ -16,4 +16,8 @@ _This repository contains code for STEM project that plants Pseudocereals in a h
 - Breadboard
 - Diodes
 - Capacitors
+- Light intensity sensor
 ## Connections and Schematic diagram
+The following diagram shows how to connect the components together:
+![Schematic Diagram]()
+![Schematic Diagram](https://cdn.jsdelivr.net/gh/Amrloksha151/Algorithmic-Automative-Adaptive-Acreage@main/schematic/greenhouse_schematic.png)
