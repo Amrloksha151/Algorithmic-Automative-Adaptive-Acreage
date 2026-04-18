@@ -1,0 +1,35 @@
+{
+  "name": "green-house-automation-system",
+  "version": "1.0.0",
+  "description": "An Automation system that creates a feedback loop supported by AI for green house projects",
+  "main": "app.js",
+  "scripts": {
+    "test": "nodemon app.js",
+    "server": "node app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Amrloksha151/Algorithmic-Automative-Adaptive-Acreage.git"
+  },
+  "keywords": [
+    "AI",
+    "Agents",
+    "Automation"
+  ],
+  "author": "Amrloksha151",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Amrloksha151/Algorithmic-Automative-Adaptive-Acreage/issues"
+  },
+  "homepage": "https://github.com/Amrloksha151/Algorithmic-Automative-Adaptive-Acreage#readme",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mqtt": "^5.15.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

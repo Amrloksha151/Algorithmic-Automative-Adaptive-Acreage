@@ -1,4 +1,5 @@
 from machine import Pin, PWM
+import asyncio
 
 PINS = {
     "pump": PWM(Pin(4), freq=...),
