@@ -9,7 +9,7 @@ while True:
         print("ON")
         print("SPEED 50%")
         sleep(20)
-        FAN.duty(1024)
+        FAN.duty(1023)
         print("SPEED 100%")
         sleep(10)
         FAN.duty(0)
