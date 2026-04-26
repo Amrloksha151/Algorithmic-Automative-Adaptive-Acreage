@@ -1,17 +1,10 @@
-from machine import Pin
-from time import sleep
+import machine
+import time
 
-PUMP = Pin(4, Pin.OUT)
+relay = machine.Pin(15, machine.Pin.OUT, value=1)  # start HIGH (relay OFF)
 
-while True:
-    try:
-        PUMP.value(1)
-        print("ON")
-        sleep(10)
-        PUMP.value(0)
-        print("OFF")
-        sleep(10)
-    except KeyboardInterrupt:
-        PUMP.value(0)
-        print("Shutting Down Machine")
-        break
+time.sleep(1)        # short settle time after boot
+
+relay.value(0)       # LOW → relay ON → pump runs
+time.sleep(10)
+relay.value(1)       # HIGH → relay OFF → pump stops
