@@ -11,7 +11,17 @@
 
 from machine import Pin, ADC
 import dht as _dht
-from config import SOIL_DRY_RAW, SOIL_WET_RAW
+from config import (
+    SOIL_DRY_RAW,
+    SOIL_WET_RAW,
+    LDR_FIXED_RESISTOR_OHM,
+    LDR_LUX_K,
+    LDR_LUX_GAMMA,
+    LDR_MIN_LUX,
+    LDR_MAX_LUX,
+    LDR_ADC_DARK_CLAMP,
+    LDR_ADC_BRIGHT_CLAMP,
+)
 
 # ── Hardware objects ──────────────────────────────────────────
 _dht22    = _dht.DHT22(Pin(7))
@@ -88,20 +98,33 @@ def read_soil() -> dict:
 def read_ldr() -> dict:
     """
     Read light intensity from LDR module AO pin.
-    Returns a 0–100 % value (0 = dark, 100 = maximum light).
+    Returns illuminance in lux.
     The module's built-in voltage divider is already on-board —
     no external resistor needed.
 
     Returns:
         {
-          "light":     float  (0.0 – 100.0 %)
+          "light":     float  (lux)
           "light_raw": int    raw ADC value for diagnostics
         }
     """
     raw = _ldr_adc.read()
-    pct = round(raw / 4095 * 100, 1)
-    _last["light"] = pct
-    return {"light": pct, "light_raw": raw}
+    adc = max(0, min(4095, raw))
+
+    if adc <= LDR_ADC_BRIGHT_CLAMP:
+        lux = LDR_MAX_LUX
+    elif adc >= LDR_ADC_DARK_CLAMP:
+        lux = LDR_MIN_LUX
+    else:
+        v_out = adc * 3.3 / 4095.0
+        # Divider model: fixed resistor to 3.3 V, LDR to GND.
+        r_ldr = LDR_FIXED_RESISTOR_OHM * v_out / (3.3 - v_out)
+        lux = LDR_LUX_K * (r_ldr ** (-LDR_LUX_GAMMA))
+        lux = max(LDR_MIN_LUX, min(LDR_MAX_LUX, lux))
+
+    lux = round(lux, 1)
+    _last["light"] = lux
+    return {"light": lux, "light_raw": raw}
 
 
 # ─────────────────────────────────────────────────────────────

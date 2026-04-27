@@ -27,8 +27,14 @@ ACTUATORS = {
         "freq":   25000,    # 25 kHz — inaudible, ideal for PC fans
         "invert": False,
     },
-    "pump_12v": {
+    "ventilation_fan": {
         "pin":    16,
+        "type":   "pwm",
+        "freq":   25000,    # 25 kHz — inaudible, ideal for PC fans
+        "invert": False,
+    },
+    "pump_12v": {
+        "pin":    18,
         "type":   "pwm",
         "freq":   1000,     # 1 kHz — suitable for DC pumps via MOSFET
         "invert": False,
@@ -41,29 +47,18 @@ ACTUATORS = {
         "invert": False,    # MOSFET: HIGH = ON
     },
 
-    # ── Add future components below ───────────────────────────
-    # Example — vent fan (PWM):
-    # "vent_fan": {
-    #     "pin":    17,
-    #     "type":   "pwm",
-    #     "freq":   25000,
-    #     "invert": False,
-    # },
-    #
-    # Example — mist maker (relay, active-LOW):
-    # "mist_maker": {
-    #     "pin":    18,
-    #     "type":   "digital",
-    #     "invert": True,
-    # },
-    #
-    # Example — LED strip (PWM):
-    # "led_strip": {
-    #     "pin":    13,
-    #     "type":   "pwm",
-    #     "freq":   1000,
-    #     "invert": False,
-    # },
+    "mist_maker": {
+        "pin":    17,
+        "type":   "digital",
+        "invert": True,     # relay module: LOW = ON
+    },
+
+    "led_strip": {
+        "pin":    13,
+        "type":   "pwm",
+        "freq":   1000,
+        "invert": False,
+    },
 }
 
 # ── Internal state ─────────────────────────────────────────────

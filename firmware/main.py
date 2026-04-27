@@ -23,10 +23,10 @@
 #    Subscribe→ {PREFIX}/commands          JSON command from server/AI
 #
 #  Command payload from server:
-#    { "device": "cooling_fan", "value": 80 }          PWM %
-#    { "device": "pump_5v",     "value": 1  }          digital ON
-#    { "device": "pump_5v",     "value": 0  }          digital OFF
-#    { "device": "__all_off__", "value": 1  }          emergency stop
+#    { "device": "cooling_fan",  "value": 80, "mode": "manual" }
+#    { "device": "pump_5v",      "value": 1,  "mode": "manual" }
+#    { "device": "pump_5v",      "value": 0,  "mode": "autonomous" }
+#    { "device": "__all_off__",  "value": 1,  "mode": "safety" }
 # ─────────────────────────────────────────────────────────────
 
 import asyncio
@@ -103,14 +103,16 @@ def _on_command(topic, msg):
     Parses JSON command and calls set_actuator().
 
     Expected payload:
-        { "device": "<name>", "value": <int> }
+        { "device": "<name>", "value": <int>, "mode": "manual|autonomous", "reason": "..." }
     """
     try:
         payload = json.loads(msg.decode())
         device  = payload.get("device", "")
         value   = payload.get("value",  0)
+        mode    = payload.get("mode", "manual")
+        reason  = payload.get("reason", "")
 
-        print(f"[CMD] {device} = {value}")
+        print(f"[CMD] mode={mode} device={device} value={value} reason={reason}")
 
         # Special command: emergency stop everything
         if device == "__all_off__":

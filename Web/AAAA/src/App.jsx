@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import mqtt from 'mqtt'
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -40,6 +41,78 @@ import {
 
 const projectName = 'Algorithmic Automative Adaptive Acreage'
 const agentName = 'Agri'
+
+const storageKeys = {
+  environment: 'aaaa-environment-settings',
+  database: 'aaaa-database-settings',
+  mqtt: 'aaaa-mqtt-settings',
+  aiService: 'aaaa-ai-service-settings',
+}
+
+const defaultMqttSettings = {
+  protocol: 'ws',
+  host: '192.168.0.49',
+  port: '8883',
+  path: '/mqtt',
+  topicPrefix: 'greenhouse',
+  username: '',
+  password: '',
+}
+
+const defaultDatabaseSettings = {
+  connectionUrl: '',
+  tableName: 'greenhouse_events',
+}
+
+const defaultAiServiceSettings = {
+  apiBaseUrl: 'http://127.0.0.1:8000',
+  ttlSeconds: 8 * 60 * 60,
+}
+
+const actuatorMap = {
+  cooling_fan: 'Cooling Fan',
+  ventilation_fan: 'Ventilation Fan',
+  led_strip: 'LED Grow Light',
+  pump_5v: 'Irrigation Pump',
+  mist_maker: 'Mist Maker',
+  pump_12v: '12V Water Pump',
+}
+
+function safeReadJson(key, fallback) {
+  if (typeof window === 'undefined') {
+    return fallback
+  }
+
+  try {
+    const raw = window.localStorage.getItem(key)
+    return raw ? { ...fallback, ...JSON.parse(raw) } : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function brokerUrlFromSettings(settings) {
+  const protocol = settings.protocol === 'wss' ? 'wss' : 'ws'
+  const path = settings.path?.startsWith('/') ? settings.path : `/${settings.path || 'mqtt'}`
+
+  return `${protocol}://${settings.host}:${settings.port}${path}`
+}
+
+function getCommandTopic(prefix) {
+  return `${prefix}/commands`
+}
+
+function getSensorTopic(prefix) {
+  return `${prefix}/sensors`
+}
+
+function getActuatorStateTopic(prefix) {
+  return `${prefix}/actuators/state`
+}
+
+function getStatusTopic(prefix) {
+  return `${prefix}/status`
+}
 
 const routes = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -87,15 +160,15 @@ const greenhousePresets = [
 ]
 
 const controlGroups = [
-  { name: 'Cooling Fan', icon: Zap, value: 80 },
-  { name: 'Ventilation Fan', icon: MoonStar, value: 52 },
-  { name: 'LED Grow Light', icon: SunMedium, value: 66 },
+  { name: 'Cooling Fan', device: 'cooling_fan', icon: Zap, value: 80 },
+  { name: 'Ventilation Fan', device: 'ventilation_fan', icon: MoonStar, value: 52 },
+  { name: 'LED Grow Light', device: 'led_strip', icon: SunMedium, value: 66 },
 ]
 
 const toggleGroups = [
-  { name: 'Irrigation Pump', icon: Droplets, on: true },
-  { name: 'Mist Maker', icon: WifiOff, on: false },
-  { name: '12V Water Pump', icon: Cpu, on: true },
+  { name: 'Irrigation Pump', device: 'pump_5v', icon: Droplets, on: true },
+  { name: 'Mist Maker', device: 'mist_maker', icon: WifiOff, on: false },
+  { name: '12V Water Pump', device: 'pump_12v', icon: Cpu, on: true },
 ]
 
 const agentMessages = [
@@ -112,6 +185,7 @@ const envPresets = [
 
 const initialEnvironment = {
   activePreset: 'tomatoes',
+  plantDescription: 'Warm-season fruiting crop with high light demand.',
   temperature: { min: 20, max: 25 },
   humidity: { min: 60, max: 70 },
   soil: { min: 55, max: 70 },
@@ -122,13 +196,310 @@ const initialEnvironment = {
 
 function App() {
   const navigate = useNavigate()
-  const [connectionState] = useState('connected')
+  const mqttClientRef = useRef(null)
+  const [connectionState, setConnectionState] = useState('offline')
   const [onboardingVisible, setOnboardingVisible] = useState(() => window.localStorage.getItem('aaaa-onboarding-complete') !== 'true')
-  const [sensorValues] = useState(sensorDefaults)
+  const [sensorValues, setSensorValues] = useState(sensorDefaults)
+  const [telemetryHistory, setTelemetryHistory] = useState([])
   const [pwmValues, setPwmValues] = useState(controlGroups)
   const [toggleValues, setToggleValues] = useState(toggleGroups)
-  const [environment, setEnvironment] = useState(initialEnvironment)
+  const [environment, setEnvironment] = useState(() => safeReadJson(storageKeys.environment, initialEnvironment))
+  const [databaseSettings, setDatabaseSettings] = useState(() => safeReadJson(storageKeys.database, defaultDatabaseSettings))
+  const [mqttSettings, setMqttSettings] = useState(() => safeReadJson(storageKeys.mqtt, defaultMqttSettings))
+  const [mqttDraft, setMqttDraft] = useState(() => safeReadJson(storageKeys.mqtt, defaultMqttSettings))
+  const [aiServiceSettings, setAiServiceSettings] = useState(() => safeReadJson(storageKeys.aiService, defaultAiServiceSettings))
+  const [aiKeyDraft, setAiKeyDraft] = useState({ openaiKey: '', googleKey: '' })
+  const [aiKeyStatus, setAiKeyStatus] = useState(null)
+  const [aiKeyMessage, setAiKeyMessage] = useState('')
   const [settingsExpanded, setSettingsExpanded] = useState({ environment: true, keys: false, mqtt: false, database: false })
+  const [lastSyncAt, setLastSyncAt] = useState(null)
+  const [recommendation, setRecommendation] = useState(null)
+
+  useEffect(() => {
+    window.localStorage.setItem(storageKeys.environment, JSON.stringify(environment))
+  }, [environment])
+
+  useEffect(() => {
+    window.localStorage.setItem(storageKeys.mqtt, JSON.stringify(mqttSettings))
+    setMqttDraft(mqttSettings)
+  }, [mqttSettings])
+
+  useEffect(() => {
+    window.localStorage.setItem(storageKeys.database, JSON.stringify(databaseSettings))
+  }, [databaseSettings])
+
+  useEffect(() => {
+    window.localStorage.setItem(storageKeys.aiService, JSON.stringify(aiServiceSettings))
+  }, [aiServiceSettings])
+
+  useEffect(() => {
+    if (!mqttSettings.host || !mqttSettings.port) {
+      setConnectionState('offline')
+      return undefined
+    }
+
+    const brokerUrl = brokerUrlFromSettings(mqttSettings)
+    const topicPrefix = mqttSettings.topicPrefix?.trim() || 'greenhouse'
+    const topics = {
+      sensors: getSensorTopic(topicPrefix),
+      actuators: getActuatorStateTopic(topicPrefix),
+      status: getStatusTopic(topicPrefix),
+    }
+
+    setConnectionState('connecting')
+    const client = mqtt.connect(brokerUrl, {
+      username: mqttSettings.username || undefined,
+      password: mqttSettings.password || undefined,
+      reconnectPeriod: 5000,
+      connectTimeout: 5000,
+    })
+    mqttClientRef.current = client
+
+    const updateFromSnapshot = (snapshot) => {
+      if (!snapshot || typeof snapshot !== 'object') {
+        return
+      }
+
+      setTelemetryHistory((current) => ([
+        ...current.slice(-299),
+        {
+          timestamp: Date.now(),
+          temperature: snapshot.temperature,
+          humidity: snapshot.humidity,
+          soil: snapshot.soil,
+          light: snapshot.light,
+        },
+      ]))
+
+      setSensorValues((current) => current.map((sensor) => {
+        if (Object.prototype.hasOwnProperty.call(snapshot, sensor.key) && snapshot[sensor.key] != null) {
+          return { ...sensor, value: Number(snapshot[sensor.key]) }
+        }
+        return sensor
+      }))
+
+      if (snapshot.actuators && typeof snapshot.actuators === 'object') {
+        setPwmValues((current) => current.map((control) => {
+          const nextValue = snapshot.actuators[control.device]
+          return typeof nextValue === 'number' ? { ...control, value: nextValue } : control
+        }))
+        setToggleValues((current) => current.map((control) => {
+          const nextValue = snapshot.actuators[control.device]
+          return typeof nextValue === 'number' ? { ...control, on: Boolean(nextValue) } : control
+        }))
+      }
+    }
+
+    client.on('connect', () => {
+      setConnectionState('connected')
+      client.subscribe([topics.sensors, topics.actuators, topics.status])
+      setLastSyncAt(new Date().toISOString())
+    })
+
+    client.on('message', (topic, payload) => {
+      const text = payload.toString()
+
+      if (topic === topics.status) {
+        setConnectionState(text === 'online' ? 'connected' : 'offline')
+        setLastSyncAt(new Date().toISOString())
+        return
+      }
+
+      try {
+        updateFromSnapshot(JSON.parse(text))
+        setLastSyncAt(new Date().toISOString())
+      } catch {
+        updateFromSnapshot({})
+      }
+    })
+
+    client.on('reconnect', () => setConnectionState('connecting'))
+    client.on('close', () => setConnectionState('offline'))
+    client.on('offline', () => setConnectionState('offline'))
+    client.on('error', () => setConnectionState('offline'))
+
+    return () => {
+      if (mqttClientRef.current === client) {
+        mqttClientRef.current = null
+      }
+      client.end(true)
+    }
+  }, [mqttSettings])
+
+  const publishCommand = (device, value, reason) => {
+    const client = mqttClientRef.current
+    if (!client || connectionState !== 'connected') {
+      return false
+    }
+
+    const topicPrefix = mqttSettings.topicPrefix?.trim() || 'greenhouse'
+    client.publish(
+      getCommandTopic(topicPrefix),
+      JSON.stringify({
+        device,
+        value,
+        reason,
+        mode: recommendation?.mode || 'manual',
+        source: 'web-ui',
+        timestamp: new Date().toISOString(),
+      }),
+    )
+    setLastSyncAt(new Date().toISOString())
+    return true
+  }
+
+  const applyMqttSettings = () => {
+    setMqttSettings(mqttDraft)
+  }
+
+  const handleEnvironmentApply = () => {
+    setEnvironment((current) => ({ ...current }))
+  }
+
+  const handleRecommendAutonomy = async () => {
+    const baseUrl = aiServiceSettings.apiBaseUrl?.trim()
+    const telemetryPayload = telemetryHistory.slice(-30)
+
+    if (baseUrl) {
+      try {
+        const response = await fetch(`${baseUrl.replace(/\/$/, '')}/ai/recommend`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            environment,
+            telemetry: telemetryPayload,
+            openai_key: aiKeyDraft.openaiKey || undefined,
+            google_key: aiKeyDraft.googleKey || undefined,
+          }),
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setRecommendation(data)
+          setAiKeyMessage('AI recommendation loaded from companion service.')
+          setAiKeyDraft({ openaiKey: '', googleKey: '' })
+          return
+        }
+
+        const errorText = await response.text()
+        setAiKeyMessage(`Companion service rejected request: ${errorText}`)
+      } catch (error) {
+        setAiKeyMessage(`Companion service unavailable, using local heuristic: ${error.message}`)
+      }
+    }
+
+    const latest = telemetryHistory[telemetryHistory.length - 1] || {}
+    const fiveMinutesAgo = telemetryHistory.slice().reverse().find((entry) => Date.now() - entry.timestamp >= 5 * 60 * 1000) || telemetryHistory[0]
+    const latestTimestamp = latest.timestamp || Date.now()
+    const baselineTimestamp = fiveMinutesAgo?.timestamp || (latestTimestamp - (5 * 60 * 1000))
+    const timeDeltaMinutes = Math.max((latestTimestamp - baselineTimestamp) / 60000, 0.5)
+
+    const latestTemperature = Number(sensorValues.find((sensor) => sensor.key === 'temperature')?.value ?? 0)
+    const latestHumidity = Number(sensorValues.find((sensor) => sensor.key === 'humidity')?.value ?? 0)
+    const latestSoil = Number(sensorValues.find((sensor) => sensor.key === 'soil')?.value ?? 0)
+    const latestLight = Number(sensorValues.find((sensor) => sensor.key === 'light')?.value ?? 0)
+
+    const baselineTemperature = Number(fiveMinutesAgo?.temperature ?? latestTemperature)
+    const baselineHumidity = Number(fiveMinutesAgo?.humidity ?? latestHumidity)
+    const baselineSoil = Number(fiveMinutesAgo?.soil ?? latestSoil)
+    const baselineLight = Number(fiveMinutesAgo?.light ?? latestLight)
+
+    const temperatureRate = (latestTemperature - baselineTemperature) / timeDeltaMinutes
+    const humidityRate = (latestHumidity - baselineHumidity) / timeDeltaMinutes
+    const soilRate = (latestSoil - baselineSoil) / timeDeltaMinutes
+    const lightRate = (latestLight - baselineLight) / timeDeltaMinutes
+
+    const temperatureGap = environment.temperature.max - latestTemperature
+    const humidityGap = environment.humidity.min - latestHumidity
+    const soilGap = environment.soil.min - latestSoil
+    const lightGap = environment.light.min - latestLight
+
+    const coolingFan = Math.max(0, Math.min(100, Math.round((Math.max(temperatureGap, 0) * 14) + Math.max(temperatureRate, 0) * 30 + Math.max(humidityGap, 0) * 1.5)))
+    const ventilationFan = Math.max(0, Math.min(100, Math.round((Math.max(temperatureGap, 0) * 10) + Math.max(humidityGap, 0) * 3 + Math.max(0, humidityRate * -20))))
+    const ledStrip = lightGap > 0 ? Math.max(0, Math.min(100, Math.round(Math.min(100, 30 + (lightGap * 12) + Math.max(0, -lightRate * 10))))) : 0
+    const irrigationPump = soilGap > 0 || soilRate < -0.1 ? 1 : 0
+    const mistMaker = humidityGap > 2 || humidityRate < -0.15 ? 1 : 0
+    const waterPump = temperatureGap > 1.5 || temperatureRate > 0.15 ? 1 : 0
+
+    const nextRecommendation = {
+      mode: 'autonomous',
+      reason: `Crop profile ${environment.activePreset}; temperature drift ${temperatureRate.toFixed(2)} °C/min and humidity drift ${humidityRate.toFixed(2)} %/min.`,
+      analysis: {
+        temperatureRate,
+        humidityRate,
+        soilRate,
+        lightRate,
+      },
+      controls: [
+        { device: 'cooling_fan', value: coolingFan },
+        { device: 'ventilation_fan', value: ventilationFan },
+        { device: 'led_strip', value: ledStrip },
+        { device: 'pump_5v', value: irrigationPump },
+        { device: 'mist_maker', value: mistMaker },
+        { device: 'pump_12v', value: waterPump },
+      ],
+    }
+
+    setRecommendation(nextRecommendation)
+  }
+
+  const submitAiKeys = async () => {
+    const baseUrl = aiServiceSettings.apiBaseUrl?.trim()
+    if (!baseUrl) {
+      setAiKeyStatus('Set the companion service URL first.')
+      return
+    }
+
+    try {
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/keys`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          openai_key: aiKeyDraft.openaiKey || undefined,
+          google_key: aiKeyDraft.googleKey || undefined,
+          ttl_seconds: aiServiceSettings.ttlSeconds,
+        }),
+      })
+
+      if (!response.ok) {
+        const text = await response.text()
+        setAiKeyStatus(`Failed to store keys: ${text}`)
+        return
+      }
+
+      const data = await response.json()
+      setAiKeyStatus(`Keys active until ${data.expires_at ? new Date(data.expires_at * 1000).toLocaleTimeString() : 'the configured TTL'}.`)
+      setAiKeyDraft({ openaiKey: '', googleKey: '' })
+    } catch (error) {
+      setAiKeyStatus(`Unable to reach companion service: ${error.message}`)
+    }
+  }
+
+  const clearAiKeys = async () => {
+    const baseUrl = aiServiceSettings.apiBaseUrl?.trim()
+    if (!baseUrl) {
+      setAiKeyStatus('Set the companion service URL first.')
+      return
+    }
+
+    try {
+      await fetch(`${baseUrl.replace(/\/$/, '')}/keys`, { method: 'DELETE' })
+      setAiKeyStatus('Transient keys cleared from the companion service.')
+    } catch (error) {
+      setAiKeyStatus(`Unable to clear keys: ${error.message}`)
+    }
+  }
+
+  const applyRecommendation = () => {
+    if (!recommendation) {
+      return
+    }
+
+    recommendation.controls.forEach((control) => {
+      publishCommand(control.device, control.value, recommendation.reason)
+    })
+    setRecommendation(null)
+  }
 
   const saveEnvironment = (next) => {
     setEnvironment(next)
@@ -147,6 +518,10 @@ function App() {
                 toggleValues={toggleValues}
                 setPwmValues={setPwmValues}
                 setToggleValues={setToggleValues}
+                publishCommand={publishCommand}
+                recommendation={recommendation}
+                onRecommendAutonomy={handleRecommendAutonomy}
+                onApplyRecommendation={applyRecommendation}
                 onOpenAgent={() => navigate('/agent')}
               />
             }
@@ -154,18 +529,18 @@ function App() {
           <Route path="/sensors" element={<SensorsPage />} />
           <Route
             path="/controls"
-            element={<ControlsPage pwmValues={pwmValues} toggleValues={toggleValues} setPwmValues={setPwmValues} setToggleValues={setToggleValues} />}
+            element={<ControlsPage pwmValues={pwmValues} toggleValues={toggleValues} setPwmValues={setPwmValues} setToggleValues={setToggleValues} publishCommand={publishCommand} />}
           />
           <Route path="/agent" element={<AgentPage />} />
           <Route
             path="/settings"
-            element={<SettingsPage environment={environment} setEnvironment={saveEnvironment} settingsExpanded={settingsExpanded} setSettingsExpanded={setSettingsExpanded} />}
+            element={<SettingsPage environment={environment} setEnvironment={saveEnvironment} databaseSettings={databaseSettings} setDatabaseSettings={setDatabaseSettings} mqttSettings={mqttDraft} setMqttSettings={setMqttDraft} applyMqttSettings={applyMqttSettings} aiServiceSettings={aiServiceSettings} setAiServiceSettings={setAiServiceSettings} aiKeyDraft={aiKeyDraft} setAiKeyDraft={setAiKeyDraft} aiKeyStatus={aiKeyStatus} aiKeyMessage={aiKeyMessage} submitAiKeys={submitAiKeys} clearAiKeys={clearAiKeys} settingsExpanded={settingsExpanded} setSettingsExpanded={setSettingsExpanded} lastSyncAt={lastSyncAt} />}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Shell>
 
-      <StatusBar connectionState={connectionState} />
+      <StatusBar connectionState={connectionState} lastSyncAt={lastSyncAt} />
       {onboardingVisible ? <OnboardingFlow onFinish={() => {
         window.localStorage.setItem('aaaa-onboarding-complete', 'true')
         setOnboardingVisible(false)
@@ -229,11 +604,11 @@ function Sidebar({ connectionState }) {
   )
 }
 
-function StatusBar({ connectionState }) {
+function StatusBar({ connectionState, lastSyncAt }) {
   return (
     <footer className="statusbar">
-      <span>Last update: just now</span>
-      <span>Broker: local client-side bridge</span>
+      <span>Last update: {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : 'waiting for data'}</span>
+      <span>Broker: browser MQTT bridge</span>
       <span>State: {connectionState}</span>
     </footer>
   )
@@ -249,7 +624,7 @@ function ConnectionPill({ state }) {
   )
 }
 
-function DashboardPage({ sensorValues, pwmValues, toggleValues, setPwmValues, setToggleValues, onOpenAgent }) {
+function DashboardPage({ sensorValues, pwmValues, toggleValues, setPwmValues, setToggleValues, publishCommand, recommendation, onRecommendAutonomy, onApplyRecommendation, onOpenAgent }) {
   return (
     <div className="page-stack">
       <section className="hero-card">
@@ -264,7 +639,31 @@ function DashboardPage({ sensorValues, pwmValues, toggleValues, setPwmValues, se
         </button>
       </section>
 
-      <AlertBanner />
+      <AlertBanner onRecommendAutonomy={onRecommendAutonomy} />
+
+      {recommendation ? (
+        <section className="card" style={{ padding: '1rem 1.25rem' }}>
+          <div className="section-heading">
+            <h2>Autonomous suggestion</h2>
+            <span>{recommendation.reason}</span>
+          </div>
+          <div className="control-stack">
+            {recommendation.controls.map((item) => (
+              <div key={item.device} className="key-row">
+                <div>
+                  <strong>{actuatorMap[item.device] || item.device}</strong>
+                  <span>{item.device}</span>
+                </div>
+                <code>{item.value}</code>
+              </div>
+            ))}
+          </div>
+          <div className="save-actions">
+            <button type="button" className="ghost-button" onClick={onRecommendAutonomy}>Regenerate</button>
+            <button type="button" className="primary-button" onClick={onApplyRecommendation}>Apply recommendation</button>
+          </div>
+        </section>
+      ) : null}
 
       <div className="dashboard-grid">
         <section className="card-grid">
@@ -273,7 +672,7 @@ function DashboardPage({ sensorValues, pwmValues, toggleValues, setPwmValues, se
           ))}
         </section>
 
-        <ControlPanel pwmValues={pwmValues} toggleValues={toggleValues} setPwmValues={setPwmValues} setToggleValues={setToggleValues} />
+        <ControlPanel pwmValues={pwmValues} toggleValues={toggleValues} setPwmValues={setPwmValues} setToggleValues={setToggleValues} publishCommand={publishCommand} />
       </div>
 
       <section className="quick-agent-bar" onClick={onOpenAgent} role="button" tabIndex={0}>
@@ -314,7 +713,7 @@ function SensorCard({ sensor }) {
   )
 }
 
-function ControlPanel({ pwmValues, toggleValues, setPwmValues, setToggleValues }) {
+function ControlPanel({ pwmValues, toggleValues, setPwmValues, setToggleValues, publishCommand }) {
   return (
     <section className="control-panel card">
       <div className="section-heading">
@@ -340,6 +739,7 @@ function ControlPanel({ pwmValues, toggleValues, setPwmValues, setToggleValues }
               onChange={(event) => {
                 const value = Number(event.target.value)
                 setPwmValues((current) => current.map((item, currentIndex) => (currentIndex === index ? { ...item, value } : item)))
+                publishCommand(control.device, value, `${control.name} manual update`)
               }}
             />
           </label>
@@ -352,7 +752,11 @@ function ControlPanel({ pwmValues, toggleValues, setPwmValues, setToggleValues }
             key={control.name}
             type="button"
             className={`toggle-row ${control.on ? 'on' : 'off'}`}
-            onClick={() => setToggleValues((current) => current.map((item, currentIndex) => (currentIndex === index ? { ...item, on: !item.on } : item)))}
+            onClick={() => {
+              const nextOn = !control.on
+              setToggleValues((current) => current.map((item, currentIndex) => (currentIndex === index ? { ...item, on: nextOn } : item)))
+              publishCommand(control.device, nextOn ? 1 : 0, `${control.name} manual update`)
+            }}
           >
             <div className="control-label">
               <control.icon size={16} />
@@ -368,7 +772,7 @@ function ControlPanel({ pwmValues, toggleValues, setPwmValues, setToggleValues }
   )
 }
 
-function AlertBanner() {
+function AlertBanner({ onRecommendAutonomy }) {
   return (
     <section className="alert-banner">
       <AlertTriangle size={18} />
@@ -376,7 +780,7 @@ function AlertBanner() {
         <strong>Temperature is slightly above the safe target.</strong>
         <p>Consider reducing fan speed or increasing shade to bring the canopy back into range.</p>
       </div>
-      <button type="button" className="ghost-button">
+      <button type="button" className="ghost-button" onClick={onRecommendAutonomy}>
         Ask {agentName}
       </button>
     </section>
@@ -429,7 +833,7 @@ function SensorsPage() {
   )
 }
 
-function ControlsPage({ pwmValues, toggleValues, setPwmValues, setToggleValues }) {
+function ControlsPage({ pwmValues, toggleValues, setPwmValues, setToggleValues, publishCommand }) {
   return (
     <div className="page-stack">
       <section className="page-header card">
@@ -438,7 +842,7 @@ function ControlsPage({ pwmValues, toggleValues, setPwmValues, setToggleValues }
           <h1>Manual controls</h1>
         </div>
       </section>
-      <ControlPanel pwmValues={pwmValues} toggleValues={toggleValues} setPwmValues={setPwmValues} setToggleValues={setToggleValues} />
+      <ControlPanel pwmValues={pwmValues} toggleValues={toggleValues} setPwmValues={setPwmValues} setToggleValues={setToggleValues} publishCommand={publishCommand} />
     </div>
   )
 }
@@ -474,11 +878,12 @@ function AgentPage() {
   )
 }
 
-function SettingsPage({ environment, setEnvironment, settingsExpanded, setSettingsExpanded }) {
+function SettingsPage({ environment, setEnvironment, databaseSettings, setDatabaseSettings, mqttSettings, setMqttSettings, applyMqttSettings, aiServiceSettings, setAiServiceSettings, aiKeyDraft, setAiKeyDraft, aiKeyStatus, aiKeyMessage, submitAiKeys, clearAiKeys, settingsExpanded, setSettingsExpanded, lastSyncAt }) {
   const applyPreset = (preset) => {
     setEnvironment({
       ...environment,
       activePreset: preset.id,
+      plantDescription: `${preset.name} profile optimized for temperature, humidity, soil, and photoperiod control.`,
       temperature: { min: preset.temp[0], max: preset.temp[1] },
       humidity: { min: preset.humidity[0], max: preset.humidity[1] },
       soil: { min: preset.soil[0], max: preset.soil[1] },
@@ -512,32 +917,107 @@ function SettingsPage({ environment, setEnvironment, settingsExpanded, setSettin
           <RangeControl label="Light" value={environment.light} onChange={(value) => setEnvironment({ ...environment, light: value })} unit="mol/m²/d" />
           <SingleValueControl label="Photoperiod" value={environment.photoperiod} onChange={(value) => setEnvironment({ ...environment, photoperiod: value })} unit="hrs/day" />
           <PlantedAreaInput value={environment.plantedArea} onChange={(value) => setEnvironment({ ...environment, plantedArea: value })} />
+          <TextAreaInput
+            label="Plant description"
+            value={environment.plantDescription}
+            onChange={(value) => setEnvironment({ ...environment, plantDescription: value })}
+            placeholder="Describe the crop, growth stage, and any special conditions."
+          />
         </div>
 
         <div className="save-bar">
           <span>Unsaved changes</span>
           <div className="save-actions">
-            <button type="button" className="ghost-button">Discard</button>
-            <button type="button" className="primary-button"><Save size={16} />Save &amp; Apply</button>
+            <button type="button" className="ghost-button" onClick={() => setEnvironment((current) => ({ ...current }))}>Discard</button>
+            <button type="button" className="primary-button" onClick={() => {
+              applyMqttSettings()
+              setEnvironment((current) => ({ ...current }))
+            }}>
+              <Save size={16} />Save &amp; Apply
+            </button>
           </div>
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Gemini API Keys" icon={ShieldAlert} expanded={settingsExpanded.keys} onToggle={() => setSettingsExpanded((current) => ({ ...current, keys: !current.keys }))} summary="1 active key">
-        <KeyRow label="#1" status="Active" value="AIza••••••••••xyz" />
-        <KeyRow label="#2" status="Standby" value="AIza••••••••••abc" />
-        <button type="button" className="add-key-button"><Plus size={16} /> Add API Key</button>
+      <SettingsSection title="AI Provider Keys" icon={ShieldAlert} expanded={settingsExpanded.keys} onToggle={() => setSettingsExpanded((current) => ({ ...current, keys: !current.keys }))} summary="Transient, no auth required">
+        <div className="environment-grid">
+          <LabeledInput
+            label="Companion service URL"
+            value={aiServiceSettings.apiBaseUrl}
+            onChange={(event) => setAiServiceSettings({ ...aiServiceSettings, apiBaseUrl: event.target.value })}
+            placeholder="http://127.0.0.1:8000"
+          />
+          <LabeledInput
+            label="Key TTL (seconds)"
+            value={aiServiceSettings.ttlSeconds}
+            onChange={(event) => setAiServiceSettings({ ...aiServiceSettings, ttlSeconds: Number(event.target.value) || 0 })}
+            placeholder="28800"
+          />
+          <LabeledInput
+            label="OpenAI API key"
+            value={aiKeyDraft.openaiKey}
+            onChange={(event) => setAiKeyDraft({ ...aiKeyDraft, openaiKey: event.target.value })}
+            placeholder="sk-..."
+          />
+          <LabeledInput
+            label="Google API key"
+            value={aiKeyDraft.googleKey}
+            onChange={(event) => setAiKeyDraft({ ...aiKeyDraft, googleKey: event.target.value })}
+            placeholder="AIza..."
+          />
+        </div>
+        <div className="inline-note">
+          Keys are sent to the companion service only for this session and expire automatically. No auth is required for the UI.
+        </div>
+        {aiKeyStatus ? <div className="inline-note">{aiKeyStatus}</div> : null}
+        {aiKeyMessage ? <div className="inline-note">{aiKeyMessage}</div> : null}
+        <div className="save-actions">
+          <button type="button" className="ghost-button" onClick={clearAiKeys}>Clear keys from service</button>
+          <button type="button" className="primary-button" onClick={submitAiKeys}>Store transient keys</button>
+        </div>
       </SettingsSection>
 
       <SettingsSection title="MQTT Broker" icon={Radio} expanded={settingsExpanded.mqtt} onToggle={() => setSettingsExpanded((current) => ({ ...current, mqtt: !current.mqtt }))} summary="Broker configured">
-        <LabeledInput label="WebSocket URL" placeholder="wss://broker.hivemq.com:8884/mqtt" />
-        <LabeledInput label="Topic Prefix" placeholder="greenhouse" />
-        <div className="inline-note">Free brokers and local options can be swapped per client installation.</div>
+        <div className="environment-grid">
+          <LabeledInput label="Broker host" value={mqttSettings.host} onChange={(event) => setMqttSettings({ ...mqttSettings, host: event.target.value })} placeholder="192.168.0.49" />
+          <LabeledInput label="Broker port" value={mqttSettings.port} onChange={(event) => setMqttSettings({ ...mqttSettings, port: event.target.value })} placeholder="8883" />
+          <LabeledInput label="WebSocket path" value={mqttSettings.path} onChange={(event) => setMqttSettings({ ...mqttSettings, path: event.target.value })} placeholder="/mqtt" />
+          <LabeledInput label="Topic prefix" value={mqttSettings.topicPrefix} onChange={(event) => setMqttSettings({ ...mqttSettings, topicPrefix: event.target.value })} placeholder="greenhouse" />
+        </div>
+        <div className="inline-note">Connected via browser MQTT over websockets. Last sync: {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : 'none yet'}.</div>
       </SettingsSection>
 
       <SettingsSection title="Neon Database" icon={Settings} expanded={settingsExpanded.database} onToggle={() => setSettingsExpanded((current) => ({ ...current, database: !current.database }))} summary="Last write: today">
-        <LabeledInput label="Connection URL" placeholder="postgres://user:pass@host/db" />
-        <div className="inline-note">This UI only stores settings locally for now; backend integration is left to the client owner.</div>
+        <div className="environment-grid">
+          <LabeledInput label="Connection URL" value={databaseSettings.connectionUrl} onChange={(event) => setDatabaseSettings({ ...databaseSettings, connectionUrl: event.target.value })} placeholder="postgres://user:pass@host/db" />
+          <LabeledInput label="Table name" value={databaseSettings.tableName} onChange={(event) => setDatabaseSettings({ ...databaseSettings, tableName: event.target.value })} placeholder="greenhouse_events" />
+        </div>
+        <div className="inline-note">Database writes will move through the companion service so the browser never holds the Neon password.</div>
+        <div className="save-actions">
+          <button type="button" className="ghost-button" onClick={async () => {
+            const baseUrl = aiServiceSettings.apiBaseUrl?.trim()
+            if (!baseUrl) {
+              alert('Set the companion service URL in the AI Keys section first')
+              return
+            }
+
+            try {
+              const res = await fetch(`${baseUrl.replace(/\/$/, '')}/db/connect`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ connectionUrl: databaseSettings.connectionUrl })
+              })
+              if (!res.ok) {
+                const text = await res.text()
+                alert('Failed to connect: ' + text)
+                return
+              }
+              alert('Companion service connected to DB and ensured schema.')
+            } catch (err) {
+              alert('Unable to reach companion service: ' + err.message)
+            }
+          }}>Connect companion to DB</button>
+        </div>
       </SettingsSection>
     </div>
   )
@@ -579,11 +1059,20 @@ function KeyRow({ label, status, value }) {
   )
 }
 
-function LabeledInput({ label, placeholder }) {
+function LabeledInput({ label, placeholder, value, onChange }) {
   return (
     <label className="labeled-input">
       <span>{label}</span>
-      <input type="text" placeholder={placeholder} />
+      <input type="text" value={value} onChange={onChange} placeholder={placeholder} />
+    </label>
+  )
+}
+
+function TextAreaInput({ label, placeholder, value, onChange }) {
+  return (
+    <label className="labeled-input">
+      <span>{label}</span>
+      <textarea value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} rows={4} />
     </label>
   )
 }

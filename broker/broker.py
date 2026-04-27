@@ -2,8 +2,8 @@ import socket
 import asyncio
 from amqtt.broker import Broker
 
-tcp_port = input("MQTT Default Port: ")
-ws_port = input("MQTT WebSocket Port: ")
+tcp_port = 1883
+ws_port = 8883
 
 ip_addr = socket.gethostbyname(socket.gethostname())
 

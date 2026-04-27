@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+asyncpg
+paho-mqtt
+python-dotenv
+httpx
+pydantic
+openai
