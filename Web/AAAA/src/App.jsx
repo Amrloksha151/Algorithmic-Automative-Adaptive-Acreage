@@ -61,10 +61,10 @@ const storageKeys = {
 
 const defaultMqttSettings = {
   protocol: 'wss',
-  host: '192.168.0.49',
-  port: '8883',
+  host: 'test.mosquitto.org',
+  port: '8081',
   path: '/mqtt',
-  topicPrefix: 'greenhouse',
+  topicPrefix: 'greenhouse-19207',
   username: '',
   password: '',
 }

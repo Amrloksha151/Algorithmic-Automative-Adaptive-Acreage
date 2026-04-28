@@ -408,7 +408,7 @@ Header: `Radio` icon + "MQTT Broker"
 
 ```
 WebSocket URL
-[wss://broker.hivemq.com:8884/mqtt        ]
+[ws://broker.hivemq.com:8884/mqtt        ]
 
 Topic Prefix
 [greenhouse                               ]
@@ -431,8 +431,8 @@ Below the form, show small info card:
 ```
 ┌──────────────────────────────────────────────────────┐
 │  💡 Free brokers                                     │
-│  HiveMQ:  wss://broker.hivemq.com:8884/mqtt         │
-│  EMQX:    wss://broker.emqx.io:8084/mqtt            │
+│  HiveMQ:  ws://broker.hivemq.com:8884/mqtt         │
+│  EMQX:    ws://broker.emqx.io:8084/mqtt            │
 │  Local:   ws://YOUR_PC_IP:8883                      │
 └──────────────────────────────────────────────────────┘
 ```

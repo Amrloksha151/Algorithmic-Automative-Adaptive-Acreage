@@ -8,12 +8,12 @@ WIFI_SSID     = "AAAA"
 WIFI_PASSWORD = "AAAA@19207"
 
 # ── MQTT broker ───────────────────────────────────────────────
-MQTT_BROKER   = "192.168.0.49"   # or your local broker IP
+MQTT_BROKER   = "test.mosquitto.org"   # or your local broker IP
 MQTT_PORT     = 1883
 MQTT_CLIENT_ID= "greenmind-esp32s3"
 
 # Topic prefix — must match your React dashboard setting
-TOPIC_PREFIX  = "greenhouse"
+TOPIC_PREFIX  = "greenhouse-19207"
 
 # Leave empty strings if your broker needs no auth
 MQTT_USER     = ""
