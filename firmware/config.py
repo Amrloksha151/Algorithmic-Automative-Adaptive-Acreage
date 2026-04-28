@@ -8,7 +8,7 @@ WIFI_SSID     = "AAAA"
 WIFI_PASSWORD = "AAAA@19207"
 
 # ── MQTT broker ───────────────────────────────────────────────
-MQTT_BROKER   = "broker.hivemq.com"   # or your local broker IP
+MQTT_BROKER   = "test.mosquitto.org"   # or your local broker IP
 MQTT_PORT     = 1883
 MQTT_CLIENT_ID= "greenmind-esp32s3"
 
