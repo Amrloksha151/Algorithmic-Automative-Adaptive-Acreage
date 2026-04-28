@@ -63,7 +63,9 @@ const defaultMqttSettings = {
   protocol: 'wss',
   host: 'test.mosquitto.org',
   port: '8081',
-  path: '',
+  // Must be a non-empty path. Empty string causes Firefox to reject the
+  // WebSocket handshake with a resource-name parse error.
+  path: '/mqtt',
   topicPrefix: 'greenhouse-19207',
   username: '',
   password: '',
@@ -122,10 +124,29 @@ function safeReadJson(keys, fallback) {
 }
 
 function brokerUrlFromSettings(settings) {
-  const protocol = 'wss'
-  const path = settings.path?.startsWith('/') ? settings.path : `/${settings.path || 'mqtt'}`
+  // Firefox's WebSocket parser is stricter than Chrome's. It rejects:
+  //   1. Any whitespace anywhere in the URL (host, port, path)
+  //   2. An empty-string resource path — must be "/" at minimum, never ""
+  //   3. A port value that is not a clean integer string
+  //   4. Fragments (#) or query strings (?…) in the WebSocket URL
+  // All four are silently accepted by Chrome but hard-fail in Firefox with
+  // "The connection to wss://… was interrupted while the page was loading."
+  const protocol    = settings.protocol === 'ws' ? 'ws' : 'wss'
+  const host        = String(settings.host  || '').trim()
+  const port        = String(settings.port  || '').trim()
 
-  return `${protocol}://${settings.host}:${settings.port}${path}`
+  // Normalise path — empty string is invalid in Firefox WebSocket URLs
+  let rawPath = String(settings.path || '').trim()
+  if (rawPath === '') {
+    rawPath = '/mqtt'
+  } else if (!rawPath.startsWith('/')) {
+    rawPath = '/' + rawPath
+  }
+  // Strip any fragment or query that may have been accidentally pasted in
+  const safePath = rawPath.split('#')[0].split('?')[0]
+
+  const portSegment = port ? ':' + port : ''
+  return protocol + '://' + host + portSegment + safePath
 }
 
 function getCommandTopic(prefix) {
@@ -300,7 +321,20 @@ function App() {
       username: mqttSettings.username || undefined,
       password: mqttSettings.password || undefined,
       reconnectPeriod: 5000,
-      connectTimeout: 5000,
+      connectTimeout: 10000,
+      // Explicitly declare the MQTT-over-WebSocket subprotocol.
+      // Firefox enforces the Sec-WebSocket-Protocol handshake strictly and
+      // will abort the upgrade if the server returns a subprotocol that was
+      // not offered by the client. The mqtt.js library sets this header
+      // automatically when wsOptions.protocols is provided, ensuring the
+      // negotiation succeeds on Firefox.
+      wsOptions: {
+        protocols: ['mqtt'],
+      },
+      // Disable automatic URL rewriting inside mqtt.js — it can prepend an
+      // extra "wss://" segment on already-qualified URLs, producing a double-
+      // protocol string that Firefox refuses to parse.
+      transformWsUrl: (url) => url,
     })
     mqttClientRef.current = client
 
@@ -1052,12 +1086,29 @@ function SettingsPage({ environment, setEnvironment, databaseSettings, setDataba
 
       <SettingsSection title="MQTT Broker" icon={Radio} expanded={settingsExpanded.mqtt} onToggle={() => setSettingsExpanded((current) => ({ ...current, mqtt: !current.mqtt }))} summary="Broker configured">
         <div className="environment-grid">
+          <label className="labeled-input">
+            <span>Protocol</span>
+            <select
+              value={mqttSettings.protocol || 'wss'}
+              onChange={(event) => setMqttSettings({ ...mqttSettings, protocol: event.target.value })}
+              style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '6px 8px' }}
+            >
+              <option value="wss">wss:// (TLS — recommended)</option>
+              <option value="ws">ws:// (plain — local only)</option>
+            </select>
+          </label>
           <LabeledInput label="Broker host" value={mqttSettings.host} onChange={(event) => setMqttSettings({ ...mqttSettings, host: event.target.value })} placeholder="192.168.0.49" />
           <LabeledInput label="Broker port" value={mqttSettings.port} onChange={(event) => setMqttSettings({ ...mqttSettings, port: event.target.value })} placeholder="8883" />
           <LabeledInput label="WebSocket path" value={mqttSettings.path} onChange={(event) => setMqttSettings({ ...mqttSettings, path: event.target.value })} placeholder="/mqtt" />
           <LabeledInput label="Topic prefix" value={mqttSettings.topicPrefix} onChange={(event) => setMqttSettings({ ...mqttSettings, topicPrefix: event.target.value })} placeholder="greenhouse" />
         </div>
-        <div className="inline-note">Connected via browser MQTT over websockets. Last sync: {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : 'none yet'}.</div>
+        <div className="inline-note">
+          Connected via browser MQTT over WebSockets. Last sync: {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : 'none yet'}.
+          <br />
+          <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', opacity: 0.75 }}>
+            URL: {brokerUrlFromSettings(mqttSettings)}
+          </span>
+        </div>
       </SettingsSection>
 
       <SettingsSection title="Neon Database" icon={Settings} expanded={settingsExpanded.database} onToggle={() => setSettingsExpanded((current) => ({ ...current, database: !current.database }))} summary="Last write: today">
