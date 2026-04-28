@@ -60,9 +60,9 @@ const storageKeys = {
 }
 
 const defaultMqttSettings = {
-  protocol: 'wss',
-  host: 'test.mosquitto.org',
-  port: '8081',
+  protocol: 'ws',
+  host: 'broker.hivemq.com',
+  port: '8000',
   path: '/mqtt',
   topicPrefix: 'greenhouse-19207',
   username: '',
@@ -122,7 +122,7 @@ function safeReadJson(keys, fallback) {
 }
 
 function brokerUrlFromSettings(settings) {
-  const protocol = 'wss'
+  const protocol = 'ws'
   const path = settings.path?.startsWith('/') ? settings.path : `/${settings.path || 'mqtt'}`
 
   return `${protocol}://${settings.host}:${settings.port}${path}`
