@@ -122,7 +122,8 @@ function safeReadJson(keys, fallback) {
 }
 
 function brokerUrlFromSettings(settings) {
-  const protocol = settings.protocol === 'wss' ? 'wss' : 'ws'
+  const isSecurePage = typeof window !== 'undefined' && window.location.protocol === 'https:'
+  const protocol = settings.protocol === 'wss' || (isSecurePage && settings.protocol !== 'ws') ? 'wss' : (isSecurePage ? 'wss' : 'ws')
   const path = settings.path?.startsWith('/') ? settings.path : `/${settings.path || 'mqtt'}`
 
   return `${protocol}://${settings.host}:${settings.port}${path}`
