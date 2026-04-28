@@ -41,12 +41,22 @@ import {
 
 const projectName = 'Algorithmic Automative Adaptive Acreage'
 const agentName = 'Agri'
+const storagePrefix = 'algorithmic-automative-adaptive-acreage'
 
-const storageKeys = {
+const legacyStorageKeys = {
   environment: 'aaaa-environment-settings',
   database: 'aaaa-database-settings',
   mqtt: 'aaaa-mqtt-settings',
   aiService: 'aaaa-ai-service-settings',
+  onboarding: 'aaaa-onboarding-complete',
+}
+
+const storageKeys = {
+  environment: `${storagePrefix}-environment-settings`,
+  database: `${storagePrefix}-database-settings`,
+  mqtt: `${storagePrefix}-mqtt-settings`,
+  aiService: `${storagePrefix}-ai-service-settings`,
+  onboarding: `${storagePrefix}-onboarding-complete`,
 }
 
 const defaultMqttSettings = {
@@ -78,14 +88,34 @@ const actuatorMap = {
   pump_12v: '12V Water Pump',
 }
 
-function safeReadJson(key, fallback) {
+function readStoredValue(keys) {
   if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    for (const key of keys) {
+      const raw = window.localStorage.getItem(key)
+      if (raw !== null) {
+        return raw
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+function safeReadJson(keys, fallback) {
+  const raw = readStoredValue(Array.isArray(keys) ? keys : [keys])
+
+  if (!raw) {
     return fallback
   }
 
   try {
-    const raw = window.localStorage.getItem(key)
-    return raw ? { ...fallback, ...JSON.parse(raw) } : fallback
+    return { ...fallback, ...JSON.parse(raw) }
   } catch {
     return fallback
   }
@@ -198,16 +228,16 @@ function App() {
   const navigate = useNavigate()
   const mqttClientRef = useRef(null)
   const [connectionState, setConnectionState] = useState('offline')
-  const [onboardingVisible, setOnboardingVisible] = useState(() => window.localStorage.getItem('aaaa-onboarding-complete') !== 'true')
+  const [onboardingVisible, setOnboardingVisible] = useState(() => readStoredValue([storageKeys.onboarding, legacyStorageKeys.onboarding]) !== 'true')
   const [sensorValues, setSensorValues] = useState(sensorDefaults)
   const [telemetryHistory, setTelemetryHistory] = useState([])
   const [pwmValues, setPwmValues] = useState(controlGroups)
   const [toggleValues, setToggleValues] = useState(toggleGroups)
-  const [environment, setEnvironment] = useState(() => safeReadJson(storageKeys.environment, initialEnvironment))
-  const [databaseSettings, setDatabaseSettings] = useState(() => safeReadJson(storageKeys.database, defaultDatabaseSettings))
-  const [mqttSettings, setMqttSettings] = useState(() => safeReadJson(storageKeys.mqtt, defaultMqttSettings))
-  const [mqttDraft, setMqttDraft] = useState(() => safeReadJson(storageKeys.mqtt, defaultMqttSettings))
-  const [aiServiceSettings, setAiServiceSettings] = useState(() => safeReadJson(storageKeys.aiService, defaultAiServiceSettings))
+  const [environment, setEnvironment] = useState(() => safeReadJson([storageKeys.environment, legacyStorageKeys.environment], initialEnvironment))
+  const [databaseSettings, setDatabaseSettings] = useState(() => safeReadJson([storageKeys.database, legacyStorageKeys.database], defaultDatabaseSettings))
+  const [mqttSettings, setMqttSettings] = useState(() => safeReadJson([storageKeys.mqtt, legacyStorageKeys.mqtt], defaultMqttSettings))
+  const [mqttDraft, setMqttDraft] = useState(() => safeReadJson([storageKeys.mqtt, legacyStorageKeys.mqtt], defaultMqttSettings))
+  const [aiServiceSettings, setAiServiceSettings] = useState(() => safeReadJson([storageKeys.aiService, legacyStorageKeys.aiService], defaultAiServiceSettings))
   const [aiKeyDraft, setAiKeyDraft] = useState({ openaiKey: '', googleKey: '' })
   const [aiKeyStatus, setAiKeyStatus] = useState(null)
   const [aiKeyMessage, setAiKeyMessage] = useState('')
@@ -231,6 +261,20 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(storageKeys.aiService, JSON.stringify(aiServiceSettings))
   }, [aiServiceSettings])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    try {
+      if (window.localStorage.getItem(legacyStorageKeys.onboarding) === 'true' && window.localStorage.getItem(storageKeys.onboarding) !== 'true') {
+        window.localStorage.setItem(storageKeys.onboarding, 'true')
+      }
+    } catch {
+      // Ignore storage migration failures; the app still renders with in-memory state.
+    }
+  }, [])
 
   useEffect(() => {
     if (!mqttSettings.host || !mqttSettings.port) {
@@ -542,7 +586,7 @@ function App() {
 
       <StatusBar connectionState={connectionState} lastSyncAt={lastSyncAt} />
       {onboardingVisible ? <OnboardingFlow onFinish={() => {
-        window.localStorage.setItem('aaaa-onboarding-complete', 'true')
+        window.localStorage.setItem(storageKeys.onboarding, 'true')
         setOnboardingVisible(false)
       }} /> : null}
     </div>

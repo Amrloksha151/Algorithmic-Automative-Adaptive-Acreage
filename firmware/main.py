@@ -47,6 +47,7 @@ T_SENSORS = f"{TOPIC_PREFIX}/sensors".encode()
 T_STATUS  = f"{TOPIC_PREFIX}/status".encode()
 T_ACT_ST  = f"{TOPIC_PREFIX}/actuators/state".encode()
 T_CMD     = f"{TOPIC_PREFIX}/commands".encode()
+MQTT_BOOT_RETRIES = 3
 
 # ── Shared state ──────────────────────────────────────────────
 _sensor_cache = {
@@ -135,38 +136,58 @@ def mqtt_connect():
     """
     Connect to the MQTT broker, set Last Will Testament,
     and subscribe to the commands topic.
+    Returns True on success, False on failure.
     """
     global _mqtt_client, _connected
+    try:
+        client = MQTTClient(
+            client_id = MQTT_CLIENT_ID,
+            server    = MQTT_BROKER,
+            port      = MQTT_PORT,
+            user      = MQTT_USER     or None,
+            password  = MQTT_PASSWORD or None,
+            keepalive = 60,
+        )
 
-    client = MQTTClient(
-        client_id = MQTT_CLIENT_ID,
-        server    = MQTT_BROKER,
-        port      = MQTT_PORT,
-        user      = MQTT_USER     or None,
-        password  = MQTT_PASSWORD or None,
-        keepalive = 60,
-    )
+        # Last Will — published automatically by broker if we disconnect
+        client.set_last_will(
+            topic   = T_STATUS,
+            msg     = b"offline",
+            retain  = True,
+            qos     = 1,
+        )
 
-    # Last Will — published automatically by broker if we disconnect
-    client.set_last_will(
-        topic   = T_STATUS,
-        msg     = b"offline",
-        retain  = True,
-        qos     = 1,
-    )
+        client.set_callback(_on_command)
+        client.connect()
+        client.subscribe(T_CMD)
 
-    client.set_callback(_on_command)
-    client.connect()
-    client.subscribe(T_CMD)
+        # Announce online
+        client.publish(T_STATUS, b"online", retain=True, qos=1)
 
-    # Announce online
-    client.publish(T_STATUS, b"online", retain=True, qos=1)
+        _mqtt_client = client
+        _connected   = True
+        print(f"[MQTT] Connected to {MQTT_BROKER}:{MQTT_PORT}")
+        print(f"[MQTT] Subscribed  → {T_CMD.decode()}")
+        print(f"[MQTT] Publishing  → {T_SENSORS.decode()}")
+        return True
+    except Exception as e:
+        _mqtt_client = None
+        _connected = False
+        print(f"[MQTT] Connect error: {e}")
+        return False
 
-    _mqtt_client = client
-    _connected   = True
-    print(f"[MQTT] Connected to {MQTT_BROKER}:{MQTT_PORT}")
-    print(f"[MQTT] Subscribed  → {T_CMD.decode()}")
-    print(f"[MQTT] Publishing  → {T_SENSORS.decode()}")
+
+def mqtt_boot_connect():
+    """Try connecting to MQTT a bounded number of times at boot."""
+    for attempt in range(1, MQTT_BOOT_RETRIES + 1):
+        print(f"[BOOT] MQTT attempt {attempt}/{MQTT_BOOT_RETRIES}...")
+        if mqtt_connect():
+            return True
+        if attempt < MQTT_BOOT_RETRIES:
+            time.sleep(2)
+
+    print(f"[BOOT] MQTT unavailable after {MQTT_BOOT_RETRIES} attempts — continuing in serial-only mode")
+    return False
 
 
 def _publish_actuator_state():
@@ -278,10 +299,9 @@ async def watchdog_loop():
             except Exception as e:
                 print(f"[WDG] MQTT lost ({e}) — reconnecting")
                 _connected = False
-                try:
-                    mqtt_connect()
-                except Exception as me:
-                    print(f"[WDG] MQTT reconnect failed: {me}")
+                mqtt_connect()
+        elif _wifi.isconnected():
+            mqtt_connect()
 
 
 async def serial_loop():
@@ -367,7 +387,7 @@ async def main():
 
     # 3. Connect MQTT broker
     print("[BOOT] Connecting to MQTT broker...")
-    mqtt_connect()
+    mqtt_boot_connect()
 
     # 4. Warm up sensors — take one reading before entering loops
     print("[BOOT] Warming up sensors...")
