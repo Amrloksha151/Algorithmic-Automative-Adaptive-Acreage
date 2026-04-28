@@ -1,59 +1,69 @@
+from __future__ import annotations
+
 import asyncio
-import json
-import asyncpg
-from typing import Optional, Any, List
-_pool: Optional[asyncpg.pool.Pool] = None
+import time
+from collections import deque
+from typing import Any, Deque, Dict, List, Optional
+
+_db_connection_url: Optional[str] = None
+_schema_ready = False
+_events: Deque[Dict[str, Any]] = deque(maxlen=5000)
+
 
 async def init_pool(db_url: Optional[str] = None):
-    """Initialize the asyncpg pool. Prefer an explicit db_url (from UI); if omitted and a pool
-    already exists, return it. This function does not read env vars.
+    """Store the UI-provided connection URL for later use.
+
+    Cloudflare Workers cannot maintain a raw asyncpg pool, so the worker runtime
+    keeps a lightweight in-memory event journal and records the connection URL
+    as configuration state. This keeps the API surface compatible while staying
+    within Workers runtime limits.
     """
-    global _pool
-    if _pool is None:
-        if not db_url:
-            raise RuntimeError('Database connection URL not provided')
-        _pool = await asyncpg.create_pool(db_url, min_size=1, max_size=4)
-    return _pool
+    global _db_connection_url
+    if db_url:
+        _db_connection_url = db_url
+    return {"connectionUrl": _db_connection_url}
+
 
 async def close_pool():
-    global _pool
-    if _pool is not None:
-        await _pool.close()
-        _pool = None
+    return None
+
 
 async def ensure_schema():
-    pool = await init_pool()
-    async with pool.acquire() as conn:
-        await conn.execute(
-            '''
-            CREATE TABLE IF NOT EXISTS greenhouse_events (
-                id BIGSERIAL PRIMARY KEY,
-                ts TIMESTAMPTZ NOT NULL DEFAULT now(),
-                event_type TEXT NOT NULL,
-                payload JSONB,
-                reason TEXT,
-                source TEXT
-            );
-            '''
-        )
+    global _schema_ready
+    if not _db_connection_url:
+        raise RuntimeError('Database connection URL not provided')
+    _schema_ready = True
+    return {"ok": True, "schemaReady": _schema_ready}
+
 
 async def write_event(event_type: str, payload: Any, reason: str = '', source: str = 'server'):
-    pool = await init_pool()
-    async with pool.acquire() as conn:
-        await conn.execute(
-            'INSERT INTO greenhouse_events(event_type, payload, reason, source) VALUES($1, $2::jsonb, $3, $4)',
-            event_type, json.dumps(payload), reason, source
-        )
+    _events.append(
+        {
+            'ts': time.time(),
+            'event_type': event_type,
+            'payload': payload,
+            'reason': reason,
+            'source': source,
+        }
+    )
+
 
 async def fetch_recent_telemetry(minutes: int = 10) -> List[dict]:
-    pool = await init_pool()
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            'SELECT ts, payload FROM greenhouse_events WHERE event_type = $1 AND ts > now() - ($2::interval) ORDER BY ts ASC',
-            'telemetry', f'{minutes} minutes'
-        )
-        return [{'ts': r['ts'].isoformat(), 'payload': r['payload']} for r in rows]
+    cutoff = time.time() - (minutes * 60)
+    return [
+        {'ts': event['ts'], 'payload': event['payload']}
+        for event in _events
+        if event['event_type'] == 'telemetry' and event['ts'] >= cutoff
+    ]
 
-# convenience synchronous helpers for scripts
+
+async def get_state() -> Dict[str, Any]:
+    return {
+        'connectionUrlConfigured': bool(_db_connection_url),
+        'schemaReady': _schema_ready,
+        'eventCount': len(_events),
+    }
+
+
 def run(coro):
     return asyncio.get_event_loop().run_until_complete(coro)

@@ -65,7 +65,7 @@ const defaultDatabaseSettings = {
 }
 
 const defaultAiServiceSettings = {
-  apiBaseUrl: 'http://127.0.0.1:8000',
+  apiBaseUrl: 'https://api.amrloksha151.top',
   ttlSeconds: 8 * 60 * 60,
 }
 
@@ -941,12 +941,12 @@ function SettingsPage({ environment, setEnvironment, databaseSettings, setDataba
 
       <SettingsSection title="AI Provider Keys" icon={ShieldAlert} expanded={settingsExpanded.keys} onToggle={() => setSettingsExpanded((current) => ({ ...current, keys: !current.keys }))} summary="Transient, no auth required">
         <div className="environment-grid">
-          <LabeledInput
-            label="Companion service URL"
-            value={aiServiceSettings.apiBaseUrl}
-            onChange={(event) => setAiServiceSettings({ ...aiServiceSettings, apiBaseUrl: event.target.value })}
-            placeholder="http://127.0.0.1:8000"
-          />
+            <LabeledInput
+              label="Companion service URL"
+              value={aiServiceSettings.apiBaseUrl}
+              onChange={(event) => setAiServiceSettings({ ...aiServiceSettings, apiBaseUrl: event.target.value })}
+              placeholder="https://api.amrloksha151.top"
+            />
           <LabeledInput
             label="Key TTL (seconds)"
             value={aiServiceSettings.ttlSeconds}

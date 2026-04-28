@@ -1,0 +1,7 @@
+name = "greenhouse-orchestrator"
+main = "worker.py"
+compatibility_date = "2026-04-28"
+compatibility_flags = ["python_workers"]
+
+[triggers]
+crons = ["*/30 * * * *"]
