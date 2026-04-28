@@ -60,7 +60,7 @@ const storageKeys = {
 }
 
 const defaultMqttSettings = {
-  protocol: 'ws',
+  protocol: 'wss',
   host: '192.168.0.49',
   port: '8883',
   path: '/mqtt',
@@ -122,7 +122,7 @@ function safeReadJson(keys, fallback) {
 }
 
 function brokerUrlFromSettings(settings) {
-  const protocol = 'ws'
+  const protocol = 'wss'
   const path = settings.path?.startsWith('/') ? settings.path : `/${settings.path || 'mqtt'}`
 
   return `${protocol}://${settings.host}:${settings.port}${path}`
