@@ -5,8 +5,9 @@ import time
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional
 
-from . import ai, db
-from .key_vault import clear_keys, get_keys, public_status, set_keys
+import ai
+import db
+from key_vault import clear_keys, get_keys, public_status, set_keys
 
 RUN_HISTORY: Deque[Dict[str, Any]] = deque(maxlen=50)
 

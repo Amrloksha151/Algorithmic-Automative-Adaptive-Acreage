@@ -1,9 +1,20 @@
 import json
 import re
 from typing import Dict, Any, List, Optional
-import httpx
+try:
+    import httpx
+    _HAS_HTTPX = True
+except Exception:
+    httpx = None
+    _HAS_HTTPX = False
 
-from .key_vault import get_keys
+try:
+    from workers import fetch as _workers_fetch
+except Exception:
+    _workers_fetch = None
+
+from key_vault import get_keys
+import urllib.parse
 
 # This module implements provider integrations that use API keys supplied
 # per-request (not stored). If provider calls fail, we fall back to the
@@ -31,12 +42,26 @@ def _extract_json(text: str) -> Optional[Dict[str, Any]]:
 
 
 async def call_google_genai(prompt: str, api_key: str) -> Dict[str, Any]:
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        payload = {"prompt": {"text": prompt}, "temperature": 0.2, "max_output_tokens": 512}
-        params = {"key": api_key}
-        r = await client.post(GOOGLE_GENAI_URL, params=params, json=payload)
-        r.raise_for_status()
-        data = r.json()
+    payload = {"prompt": {"text": prompt}, "temperature": 0.2, "max_output_tokens": 512}
+    params = {"key": api_key}
+    if _HAS_HTTPX:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.post(GOOGLE_GENAI_URL, params=params, json=payload)
+            r.raise_for_status()
+            data = r.json()
+    elif _workers_fetch is not None:
+        url = GOOGLE_GENAI_URL + "?" + urllib.parse.urlencode(params)
+        headers = {"Content-Type": "application/json"}
+        resp = await _workers_fetch(url, method='POST', headers=headers, body=json.dumps(payload))
+        text = await resp.text()
+        if resp.status >= 400:
+            raise ValueError(f"Google GenAI error: {resp.status} {text}")
+        try:
+            data = json.loads(text)
+        except Exception:
+            data = {}
+    else:
+        raise RuntimeError("No HTTP client available (httpx or workers.fetch required)")
         # Google returns candidates with content text
         text = None
         if isinstance(data, dict):
@@ -74,10 +99,23 @@ async def call_google_tool_agent(
         'Content-Type': 'application/json',
     }
 
-    async with httpx.AsyncClient(timeout=45.0) as client:
-        response = await client.post(GEMINI_GENERATE_URL.format(model=model), headers=headers, json=payload)
-        response.raise_for_status()
-        return response.json()
+    url = GEMINI_GENERATE_URL.format(model=model)
+    if _HAS_HTTPX:
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            return response.json()
+    elif _workers_fetch is not None:
+        resp = await _workers_fetch(url, method='POST', headers=headers, body=json.dumps(payload))
+        text = await resp.text()
+        if resp.status >= 400:
+            raise ValueError(f"Gemini error: {resp.status} {text}")
+        try:
+            return json.loads(text)
+        except Exception:
+            return {'raw': text}
+    else:
+        raise RuntimeError("No HTTP client available (httpx or workers.fetch required)")
 
 
 def _google_extract_function_calls(response: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -138,14 +176,24 @@ async def call_openai(prompt: str, api_key: str) -> Dict[str, Any]:
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
-
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(OPENAI_CHAT_URL, headers=headers, json=payload)
-        if resp.status_code >= 400:
-            # Retry a cheaper/older model once before failing to the heuristic
-            payload["model"] = "gpt-4o-mini"
-            resp.raise_for_status()
-        data = resp.json()
+    if _HAS_HTTPX:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(OPENAI_CHAT_URL, headers=headers, json=payload)
+            if resp.status_code >= 400:
+                payload["model"] = "gpt-4o-mini"
+                resp.raise_for_status()
+            data = resp.json()
+    elif _workers_fetch is not None:
+        resp = await _workers_fetch(OPENAI_CHAT_URL, method='POST', headers=headers, body=json.dumps(payload))
+        text = await resp.text()
+        if resp.status >= 400:
+            raise ValueError(f"OpenAI error: {resp.status} {text}")
+        try:
+            data = json.loads(text)
+        except Exception:
+            data = {}
+    else:
+        raise RuntimeError("No HTTP client available (httpx or workers.fetch required)")
 
     text = ""
     choices = data.get("choices") or []
@@ -173,11 +221,22 @@ async def call_openai_tool_agent(*, api_key: str, messages: List[Dict[str, Any]]
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json',
     }
-
-    async with httpx.AsyncClient(timeout=45.0) as client:
-        response = await client.post(OPENAI_CHAT_URL, headers=headers, json=payload)
-        response.raise_for_status()
-        return response.json()
+    if _HAS_HTTPX:
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            response = await client.post(OPENAI_CHAT_URL, headers=headers, json=payload)
+            response.raise_for_status()
+            return response.json()
+    elif _workers_fetch is not None:
+        resp = await _workers_fetch(OPENAI_CHAT_URL, method='POST', headers=headers, body=json.dumps(payload))
+        text = await resp.text()
+        if resp.status >= 400:
+            raise ValueError(f"OpenAI tool-agent error: {resp.status} {text}")
+        try:
+            return json.loads(text)
+        except Exception:
+            return {'raw': text}
+    else:
+        raise RuntimeError("No HTTP client available (httpx or workers.fetch required)")
 
 async def heuristic_recommendation(telemetry: List[Dict[str, Any]], environment: Dict[str, Any]) -> Dict[str, Any]:
     # Simple non-AI fallback: use latest reading and simple deltas
@@ -219,7 +278,7 @@ async def get_recommendation(telemetry: List[Dict[str, Any]], environment: Dict[
     google_key = google_key or vault_keys.get('google_key')
 
     if openai_key or google_key:
-        from .agent import run_agent
+        from agent import run_agent
 
         return await run_agent(
             goal='Recommend greenhouse controls from telemetry and crop targets.',

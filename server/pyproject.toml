@@ -4,14 +4,11 @@ version = "0.1.0"
 description = "Cloudflare Workers backend for the greenhouse dashboard"
 requires-python = ">=3.13"
 dependencies = [
-  "fastapi",
   "httpx",
-  "pydantic",
-  "openai",
 ]
 
 [dependency-groups]
 dev = [
-  "workers-py",
+  "workers-py>=1.90.0",
   "workers-runtime-sdk",
 ]
