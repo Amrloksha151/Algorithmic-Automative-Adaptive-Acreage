@@ -60,13 +60,13 @@ const storageKeys = {
 }
 
 const defaultMqttSettings = {
-  protocol: 'wss',
-  host: 'test.mosquitto.org',
-  port: '8081',
+  protocol: 'ws',
+  host: '192.168.0.49',
+  port: '8883',
   // Must be a non-empty path. Empty string causes Firefox to reject the
   // WebSocket handshake with a resource-name parse error.
   path: '/mqtt',
-  topicPrefix: 'greenhouse-19207',
+  topicPrefix: 'greenhouse',
   username: '',
   password: '',
 }

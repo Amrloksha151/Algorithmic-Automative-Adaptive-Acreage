@@ -32,7 +32,7 @@ async def main():
     broker = Broker(config)
     try:
         await broker.start()
-        print(f"MQTT TCP Server Listening on http://{ip_addr}:{tcp_port}\nWeb Socket Server Listening on ws://{ip_addr}:{ws_port}")
+        print(f"MQTT TCP Server Listening on mqtt://192.168.0.49:{tcp_port}\nWeb Socket Server Listening on ws://192.168.0.49:{ws_port}")
         while True:
             await asyncio.sleep(1)
     except asyncio.CancelledError:

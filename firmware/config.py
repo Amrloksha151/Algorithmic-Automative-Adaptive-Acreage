@@ -13,7 +13,7 @@ MQTT_PORT     = 1883
 MQTT_CLIENT_ID= "greenmind-esp32s3"
 
 # Topic prefix — must match your React dashboard setting
-TOPIC_PREFIX  = "greenhouse-19207"
+TOPIC_PREFIX  = "greenhouse"
 
 # Leave empty strings if your broker needs no auth
 MQTT_USER     = ""
