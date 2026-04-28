@@ -63,7 +63,7 @@ const defaultMqttSettings = {
   protocol: 'wss',
   host: 'test.mosquitto.org',
   port: '8081',
-  path: '/mqtt',
+  path: '',
   topicPrefix: 'greenhouse-19207',
   username: '',
   password: '',
