@@ -1,7 +1,7 @@
 from time import sleep
 from machine import Pin, PWM
 
-FAN = PWM(Pin(18), freq=25000)
+FAN = PWM(Pin(6), freq=25000)
 #kosm stem
 
 while True:

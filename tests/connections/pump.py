@@ -5,6 +5,6 @@ relay = machine.Pin(15, machine.Pin.OUT, value=1)  # start HIGH (relay OFF)
 
 time.sleep(1)        # short settle time after boot
 
-relay.value(0)       # LOW → relay ON → pump runs
+relay.value(1)       # LOW → relay ON → pump runs
 time.sleep(10)
-relay.value(1)       # HIGH → relay OFF → pump stops
+relay.value(0)       # HIGH → relay OFF → pump stops
