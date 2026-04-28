@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Any, Dict
 from . import db, ai
+from .agent import recent_runs, run_agent
 from .key_vault import set_keys, clear_keys, public_status
 
 app = FastAPI(title='Greenhouse Orchestrator')
@@ -42,6 +43,15 @@ class AutonomyPayload(BaseModel):
 class RecommendPayload(BaseModel):
     environment: Dict[str, Any]
     telemetry: list[dict[str, Any]] | None = None
+    openai_key: str | None = None
+    google_key: str | None = None
+
+
+class AgentRunPayload(BaseModel):
+    goal: str
+    environment: Dict[str, Any]
+    telemetry: list[dict[str, Any]] | None = None
+    telemetry_minutes: int = 10
     openai_key: str | None = None
     google_key: str | None = None
 
@@ -97,6 +107,25 @@ async def state():
     return await db.get_state()
 
 
+@app.get('/agent/history')
+async def agent_history():
+    return {'runs': await recent_runs()}
+
+
+@app.post('/agent/run')
+async def agent_run(payload: AgentRunPayload):
+    telemetry = payload.telemetry or await db.fetch_recent_telemetry(payload.telemetry_minutes)
+    result = await run_agent(
+        goal=payload.goal,
+        environment=payload.environment,
+        telemetry=telemetry,
+        telemetry_minutes=payload.telemetry_minutes,
+        openai_key=payload.openai_key,
+        google_key=payload.google_key,
+    )
+    return {'ok': True, 'result': result}
+
+
 @app.post('/ai/recommend')
 async def recommend(payload: RecommendPayload):
     # payload should include environment profile and optionally a telemetry window
@@ -112,7 +141,13 @@ async def recommend(payload: RecommendPayload):
     if not environment:
         raise HTTPException(status_code=400, detail='environment required')
 
-    rec = await ai.get_recommendation(telemetry, environment, openai_key=openai_key, google_key=google_key)
+    rec = await run_agent(
+        goal='Recommend greenhouse controls from telemetry and crop targets.',
+        environment=environment,
+        telemetry=telemetry,
+        openai_key=openai_key,
+        google_key=google_key,
+    )
     # write decision to DB
     await db.write_event('decision', rec, reason='ai/recommend', source='ai')
     return rec
@@ -128,7 +163,13 @@ async def trigger_autonomy(payload: AutonomyPayload):
         set_keys(openai_key=openai_key, google_key=google_key)
 
     # Use provided keys for this manual trigger if available; scheduled loop will use vault keys or heuristic
-    rec = await ai.get_recommendation(telemetry, environment, openai_key=openai_key, google_key=google_key)
+    rec = await run_agent(
+        goal='Apply safe autonomous greenhouse controls.',
+        environment=environment,
+        telemetry=telemetry,
+        openai_key=openai_key,
+        google_key=google_key,
+    )
 
     await db.write_event('autonomy', rec, reason='autonomy/trigger', source='orchestrator')
     return {'ok': True, 'decision': rec}
@@ -143,6 +184,10 @@ async def run_autonomy_cycle():
         'light': {'min': 16, 'max': 20},
         'photoperiod': 14,
     }
-    rec = await ai.get_recommendation(telemetry, default_env)
+    rec = await run_agent(
+        goal='Scheduled autonomy review cycle.',
+        environment=default_env,
+        telemetry=telemetry,
+    )
     await db.write_event('autonomy', rec, reason='scheduled autoloop', source='orchestrator')
     return rec

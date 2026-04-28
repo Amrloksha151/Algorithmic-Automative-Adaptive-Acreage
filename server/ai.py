@@ -11,6 +11,12 @@ from .key_vault import get_keys
 
 GOOGLE_GENAI_URL = "https://generativelanguage.googleapis.com/v1beta2/models/text-bison-001:generate"
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
+GEMINI_GENERATE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+GEMINI_DEFAULT_MODEL = "gemini-2.0-flash"
+
+
+def _json_dumps(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(',', ':'))
 
 
 def _extract_json(text: str) -> Optional[Dict[str, Any]]:
@@ -45,6 +51,76 @@ async def call_google_genai(prompt: str, api_key: str) -> Dict[str, Any]:
             return parsed
         # Last resort: return boxed text as 'reason'
         return {"mode": "autonomous", "reason": text, "controls": []}
+
+
+async def call_google_tool_agent(
+    *,
+    api_key: str,
+    contents: List[Dict[str, Any]],
+    tools: List[Dict[str, Any]],
+    model: str = GEMINI_DEFAULT_MODEL,
+) -> Dict[str, Any]:
+    payload = {
+        'contents': contents,
+        'tools': [
+            {
+                'functionDeclarations': [tool['function'] for tool in tools if tool.get('type') == 'function'],
+            }
+        ],
+    }
+
+    headers = {
+        'x-goog-api-key': api_key,
+        'Content-Type': 'application/json',
+    }
+
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        response = await client.post(GEMINI_GENERATE_URL.format(model=model), headers=headers, json=payload)
+        response.raise_for_status()
+        return response.json()
+
+
+def _google_extract_function_calls(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    candidates = response.get('candidates') or []
+    if not candidates:
+        return []
+    content = (candidates[0] or {}).get('content') or {}
+    parts = content.get('parts') or []
+    function_calls = []
+    for part in parts:
+        function_call = part.get('functionCall') or part.get('function_call')
+        if function_call:
+            function_calls.append(function_call)
+    return function_calls
+
+
+def _google_extract_text(response: Dict[str, Any]) -> str:
+    candidates = response.get('candidates') or []
+    if not candidates:
+        return ''
+    content = (candidates[0] or {}).get('content') or {}
+    parts = content.get('parts') or []
+    texts = []
+    for part in parts:
+        text = part.get('text')
+        if text:
+            texts.append(text)
+    return '\n'.join(texts).strip()
+
+
+def _google_function_response_part(name: str, call_id: str, result: Any) -> Dict[str, Any]:
+    return {
+        'role': 'user',
+        'parts': [
+            {
+                'functionResponse': {
+                    'name': name,
+                    'id': call_id,
+                    'response': result,
+                }
+            }
+        ],
+    }
 
 
 async def call_openai(prompt: str, api_key: str) -> Dict[str, Any]:
@@ -82,6 +158,27 @@ async def call_openai(prompt: str, api_key: str) -> Dict[str, Any]:
     # If the model returned plain text instructions, wrap as reason
     return {"mode": "autonomous", "reason": text, "controls": []}
 
+
+async def call_openai_tool_agent(*, api_key: str, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]], model: str = 'gpt-4o-mini', temperature: float = 0.2, max_tokens: int = 700) -> Dict[str, Any]:
+    payload = {
+        'model': model,
+        'messages': messages,
+        'tools': tools,
+        'tool_choice': 'auto',
+        'temperature': temperature,
+        'max_tokens': max_tokens,
+    }
+
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+    }
+
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        response = await client.post(OPENAI_CHAT_URL, headers=headers, json=payload)
+        response.raise_for_status()
+        return response.json()
+
 async def heuristic_recommendation(telemetry: List[Dict[str, Any]], environment: Dict[str, Any]) -> Dict[str, Any]:
     # Simple non-AI fallback: use latest reading and simple deltas
     latest = telemetry[-1]['payload'] if telemetry else {}
@@ -117,23 +214,21 @@ async def heuristic_recommendation(telemetry: List[Dict[str, Any]], environment:
 
 
 async def get_recommendation(telemetry: List[Dict[str, Any]], environment: Dict[str, Any], *, openai_key: Optional[str] = None, google_key: Optional[str] = None) -> Dict[str, Any]:
-    prompt = f"Telemetry: {telemetry[-5:]}\nTarget: {environment}\nSuggest actuator values as JSON with keys mode, reason, controls where controls is a list of {{device, value}} entries."
     vault_keys = get_keys()
-    openai_key = openai_key or vault_keys.get("openai_key")
-    google_key = google_key or vault_keys.get("google_key")
+    openai_key = openai_key or vault_keys.get('openai_key')
+    google_key = google_key or vault_keys.get('google_key')
 
-    # Try Google key first
-    if google_key:
-        try:
-            return await call_google_genai(prompt, google_key)
-        except Exception as e:
-            print(f"Google GenAI failed: {e}")
+    if openai_key or google_key:
+        from .agent import run_agent
 
-    if openai_key:
-        try:
-            return await call_openai(prompt, openai_key)
-        except Exception as e:
-            print(f"OpenAI failed: {e}")
+        return await run_agent(
+            goal='Recommend greenhouse controls from telemetry and crop targets.',
+            environment=environment,
+            telemetry=telemetry,
+            openai_key=openai_key,
+            google_key=google_key,
+        )
 
-    # fallback
+    prompt = f"Telemetry: {telemetry[-5:]}\nTarget: {environment}\nSuggest actuator values as JSON with keys mode, reason, controls where controls is a list of {{device, value}} entries."
+
     return await heuristic_recommendation(telemetry, environment)
