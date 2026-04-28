@@ -252,7 +252,6 @@ function App() {
 
   useEffect(() => {
     window.localStorage.setItem(storageKeys.mqtt, JSON.stringify(mqttSettings))
-    setMqttDraft(mqttSettings)
   }, [mqttSettings])
 
   useEffect(() => {
@@ -279,8 +278,11 @@ function App() {
 
   useEffect(() => {
     if (!mqttSettings.host || !mqttSettings.port) {
-      setConnectionState('offline')
-      return undefined
+      const offlineTimer = window.setTimeout(() => {
+        setConnectionState('offline')
+      }, 0)
+
+      return () => window.clearTimeout(offlineTimer)
     }
 
     const brokerUrl = brokerUrlFromSettings(mqttSettings)
@@ -291,7 +293,10 @@ function App() {
       status: getStatusTopic(topicPrefix),
     }
 
-    setConnectionState('connecting')
+    const connectingTimer = window.setTimeout(() => {
+      setConnectionState('connecting')
+    }, 0)
+    let isActive = true
     const client = mqtt.connect(brokerUrl, {
       username: mqttSettings.username || undefined,
       password: mqttSettings.password || undefined,
@@ -336,12 +341,18 @@ function App() {
     }
 
     client.on('connect', () => {
+      if (!isActive) {
+        return
+      }
       setConnectionState('connected')
       client.subscribe([topics.sensors, topics.actuators, topics.status])
       setLastSyncAt(new Date().toISOString())
     })
 
     client.on('message', (topic, payload) => {
+      if (!isActive) {
+        return
+      }
       const text = payload.toString()
 
       if (topic === topics.status) {
@@ -358,16 +369,38 @@ function App() {
       }
     })
 
-    client.on('reconnect', () => setConnectionState('connecting'))
-    client.on('close', () => setConnectionState('offline'))
-    client.on('offline', () => setConnectionState('offline'))
-    client.on('error', () => setConnectionState('offline'))
+    client.on('reconnect', () => {
+      if (!isActive) {
+        return
+      }
+      setConnectionState('connecting')
+    })
+    client.on('close', () => {
+      if (!isActive) {
+        return
+      }
+      setConnectionState('offline')
+    })
+    client.on('offline', () => {
+      if (!isActive) {
+        return
+      }
+      setConnectionState('offline')
+    })
+    client.on('error', () => {
+      if (!isActive) {
+        return
+      }
+      setConnectionState('offline')
+    })
 
     return () => {
+      window.clearTimeout(connectingTimer)
+      isActive = false
       if (mqttClientRef.current === client) {
         mqttClientRef.current = null
       }
-      client.end(true)
+      client.end()
     }
   }, [mqttSettings])
 
@@ -395,10 +428,6 @@ function App() {
 
   const applyMqttSettings = () => {
     setMqttSettings(mqttDraft)
-  }
-
-  const handleEnvironmentApply = () => {
-    setEnvironment((current) => ({ ...current }))
   }
 
   const handleRecommendAutonomy = async () => {
