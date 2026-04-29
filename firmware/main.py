@@ -64,6 +64,25 @@ _wifi        = None
 _connected   = False
 
 
+def _reset_mqtt_client(reason=None):
+    """Close and forget the current MQTT client before reconnecting."""
+    global _mqtt_client, _connected
+    client = _mqtt_client
+    _mqtt_client = None
+    _connected = False
+
+    if not client:
+        return
+
+    try:
+        client.disconnect()
+    except Exception as exc:
+        if reason:
+            print("[MQTT] Cleanup after", reason, "failed:", exc)
+        else:
+            print("[MQTT] Cleanup failed:", exc)
+
+
 # ═════════════════════════════════════════════════════════════
 #  WIFI  (blocking — runs before async loop starts)
 # ═════════════════════════════════════════════════════════════
@@ -124,7 +143,7 @@ def _publish_actuator_state():
         _mqtt_client.publish(T_ACT_ST, json.dumps(get_state()).encode(), retain=True)
     except Exception as exc:
         print("[MQTT] Actuator publish error:", exc)
-        _connected = False
+        _reset_mqtt_client("actuator publish error")
 
 
 def mqtt_connect():
@@ -133,6 +152,7 @@ def mqtt_connect():
     Safe to call from both the boot sequence and the watchdog task.
     """
     global _mqtt_client, _connected
+    _reset_mqtt_client("reconnect")
     try:
         client = MQTTClient(
             client_id = MQTT_CLIENT_ID,
@@ -159,8 +179,7 @@ def mqtt_connect():
         return True
     except Exception as exc:
         print("[MQTT] Connect failed:", exc)
-        _mqtt_client = None
-        _connected   = False
+        _reset_mqtt_client("connect failure")
         return False
 
 
@@ -212,7 +231,7 @@ async def publish_loop():
                 _mqtt_client.publish(T_SENSORS, payload)
             except Exception as exc:
                 print("[MQTT] Publish error:", exc)
-                _connected = False   # watchdog reconnects
+                _reset_mqtt_client("publish error")
         await asyncio.sleep(SENSOR_INTERVAL)
 
 
@@ -231,7 +250,7 @@ async def mqtt_loop():
                 _mqtt_client.check_msg()
             except Exception as exc:
                 print("[MQTT] check_msg error:", exc)
-                _connected = False   # watchdog reconnects
+                _reset_mqtt_client("check_msg error")
         await asyncio.sleep(0.1)
 
 
@@ -255,7 +274,7 @@ async def watchdog_loop():
                 _mqtt_client.ping()
             except Exception as exc:
                 print("[WDG] Ping failed:", exc)
-                _connected = False
+                _reset_mqtt_client("ping failure")
 
 
 # ═════════════════════════════════════════════════════════════

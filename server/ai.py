@@ -256,7 +256,7 @@ async def heuristic_recommendation(telemetry: List[Dict[str, Any]], environment:
     led = int(min(100, max(0, 30 + l_gap * 12))) if l_gap > 0 else 0
     irrigation = 1 if s_gap > 0 else 0
     mist = 1 if h_gap > 2 else 0
-    pump12 = 1 if t_gap > 1 else 0
+    pump12 = int(min(100, max(0, (t_gap * 18) + (t_gap > 1) * 35))) if t_gap > 0 else 0
 
     return {
         'mode': 'autonomous',
@@ -288,6 +288,6 @@ async def get_recommendation(telemetry: List[Dict[str, Any]], environment: Dict[
             google_key=google_key,
         )
 
-    prompt = f"Telemetry: {telemetry[-5:]}\nTarget: {environment}\nSuggest actuator values as JSON with keys mode, reason, controls where controls is a list of {{device, value}} entries."
+        prompt = f"Telemetry: {telemetry[-5:]}\nTarget: {environment}\nSuggest actuator values as JSON with keys mode, reason, controls where controls is a list of {{device, value}} entries. PWM devices are cooling_fan, ventilation_fan, led_strip, and pump_12v and should use 0-100 values. Digital devices are pump_5v and mist_maker and should use 0 or 1 values."
 
     return await heuristic_recommendation(telemetry, environment)

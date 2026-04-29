@@ -46,3 +46,243 @@
 2026-04-28 09:36:35  INFO      greenmind.broker      
 2026-04-28 09:36:35  WARNING   amqtt.contexts        sys_interval is deprecated, use 'plugins' to define configuration
 2026-04-28 09:36:35  WARNING   amqtt.contexts        'auth' and 'topic-check' are deprecated, use 'plugins' to define configuration
+2026-04-28 09:42:31  INFO      greenmind.broker      
+2026-04-28 09:42:31  INFO      greenmind.broker      ╔══════════════════════════════════════════════════════╗
+2026-04-28 09:42:31  INFO      greenmind.broker      ║          GreenMind  —  Local MQTT Broker             ║
+2026-04-28 09:42:31  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 09:42:31  INFO      greenmind.broker      ║  TCP  (ESP32)    mqtt://192.168.0.49:1883                ║
+2026-04-28 09:42:31  INFO      greenmind.broker      ║  WS   (Browser)  ws://192.168.0.49:8883 /mqtt            ║
+2026-04-28 09:42:31  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 09:42:31  INFO      greenmind.broker      ║  Topic prefix    greenhouse-19207                    ║
+2026-04-28 09:42:31  INFO      greenmind.broker      ║  Authentication  disabled (open)                     ║
+2026-04-28 09:42:31  INFO      greenmind.broker      ║  Max connections 50                                  ║
+2026-04-28 09:42:31  INFO      greenmind.broker      ║  Log file        broker.log                          ║
+2026-04-28 09:42:31  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 09:42:31  INFO      greenmind.broker      ║  Paste into React app → Settings → MQTT Broker:     ║
+2026-04-28 09:42:31  INFO      greenmind.broker      ║    Protocol: ws://                                   ║
+2026-04-28 09:42:31  INFO      greenmind.broker      ║    Host:     192.168.0.49                              ║
+2026-04-28 09:42:31  INFO      greenmind.broker      ║    Port:     8883                                      ║
+2026-04-28 09:42:31  INFO      greenmind.broker      ║    Path:     /mqtt                                   ║
+2026-04-28 09:42:31  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 09:42:31  INFO      greenmind.broker      ║  Paste into ESP32 config.py:                         ║
+2026-04-28 09:42:31  INFO      greenmind.broker      ║    MQTT_BROKER = "192.168.0.49"
+2026-04-28 09:42:31  INFO      greenmind.broker      ║    MQTT_PORT   = 1883                                  ║
+2026-04-28 09:42:31  INFO      greenmind.broker      ╚══════════════════════════════════════════════════════╝
+2026-04-28 09:42:31  INFO      greenmind.broker      
+2026-04-28 09:42:31  INFO      amqtt.broker.plugins  Loading plugins from config
+2026-04-28 09:42:31  INFO      amqtt.broker          Listener 'default' bind to 0.0.0.0:1883 (max_connections=50)
+2026-04-28 09:42:31  INFO      websockets.server     server listening on 0.0.0.0:8883
+2026-04-28 09:42:31  INFO      amqtt.broker          Listener 'ws' bind to 0.0.0.0:8883 (max_connections=50)
+2026-04-28 09:42:31  INFO      greenmind.broker      Broker running — press Ctrl+C to stop
+2026-04-28 09:42:31  INFO      amqtt.broker          Starting session expiration monitor.
+2026-04-28 09:46:20  INFO      websockets.server     connection open
+2026-04-28 09:46:20  INFO      amqtt.broker          Listener 'ws': 1/50 connections acquired
+2026-04-28 09:46:20  INFO      amqtt.broker          Connection from 192.168.0.49:62738 on listener 'ws'
+2026-04-28 09:46:20  INFO      websockets.server     connection open
+2026-04-28 09:46:20  INFO      amqtt.broker          Listener 'ws': 2/50 connections acquired
+2026-04-28 09:46:20  INFO      amqtt.broker          Connection from 192.168.0.49:62739 on listener 'ws'
+2026-04-28 09:46:20  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 09:46:20  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 10:01:53  INFO      amqtt.broker          Listener 'default': 1/50 connections acquired
+2026-04-28 10:01:53  INFO      amqtt.broker          Connection from 192.168.0.5:59277 on listener 'default'
+2026-04-28 10:01:53  ERROR     amqtt.broker          No data from (client @=192.168.0.5:59277) : No more data
+2026-04-28 10:01:53  WARNING   amqtt.broker          Failed to initialize client session: No more data
+2026-04-28 10:01:53  INFO      amqtt.broker          Listener 'default': 0/50 connections acquired
+2026-04-28 10:01:53  INFO      amqtt.broker          Listener 'default': 1/50 connections acquired
+2026-04-28 10:01:53  INFO      amqtt.broker          Connection from 192.168.0.5:59278 on listener 'default'
+2026-04-28 10:01:53  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 10:01:53  INFO      amqtt.broker          Listener 'default': 0/50 connections acquired
+2026-04-28 10:01:53  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 10:01:53  INFO      amqtt.broker          Listener 'default': 1/50 connections acquired
+2026-04-28 10:01:53  INFO      amqtt.broker          Connection from 192.168.0.5:59279 on listener 'default'
+2026-04-28 10:01:53  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 10:01:53  INFO      amqtt.broker          Listener 'default': 0/50 connections acquired
+2026-04-28 10:01:53  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 10:01:53  INFO      amqtt.broker          Listener 'default': 1/50 connections acquired
+2026-04-28 10:01:53  INFO      amqtt.broker          Connection from 192.168.0.5:59280 on listener 'default'
+2026-04-28 10:01:53  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 10:01:53  INFO      amqtt.broker          Listener 'default': 0/50 connections acquired
+2026-04-28 10:01:53  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 10:10:32  WARNING   amqtt.mqtt.protocol.handler  BrokerProtocolHandler Unhandled exception in reader coro: error('unpack requires a buffer of 1 bytes')
+2026-04-28 10:10:32  WARNING   amqtt.mqtt.protocol.handler  BrokerProtocolHandler Unhandled exception in reader coro: error('unpack requires a buffer of 1 bytes')
+2026-04-28 10:10:32  INFO      amqtt.broker          Listener 'ws': 1/50 connections acquired
+2026-04-28 10:10:32  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 10:10:32  INFO      amqtt.broker          Listener 'ws': 0/50 connections acquired
+2026-04-28 10:10:32  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 10:56:51  INFO      greenmind.broker      Stopping broker — flushing retained messages
+2026-04-28 10:56:51  INFO      amqtt.broker          Shutting down broker...
+2026-04-28 10:56:51  INFO      websockets.server     server closing
+2026-04-28 10:56:51  INFO      websockets.server     server closed
+2026-04-28 10:56:51  INFO      amqtt.broker          Broker closed
+2026-04-28 10:56:51  INFO      greenmind.broker      Broker stopped. Goodbye.
+2026-04-28 11:36:25  INFO      greenmind.broker      
+2026-04-28 11:36:25  INFO      greenmind.broker      ╔══════════════════════════════════════════════════════╗
+2026-04-28 11:36:25  INFO      greenmind.broker      ║          GreenMind  —  Local MQTT Broker             ║
+2026-04-28 11:36:25  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 11:36:25  INFO      greenmind.broker      ║  TCP  (ESP32)    mqtt://172.20.10.13:1883                ║
+2026-04-28 11:36:25  INFO      greenmind.broker      ║  WS   (Browser)  ws://172.20.10.13:8883 /mqtt            ║
+2026-04-28 11:36:25  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 11:36:25  INFO      greenmind.broker      ║  Topic prefix    greenhouse-19207                    ║
+2026-04-28 11:36:25  INFO      greenmind.broker      ║  Authentication  disabled (open)                     ║
+2026-04-28 11:36:25  INFO      greenmind.broker      ║  Max connections 50                                  ║
+2026-04-28 11:36:25  INFO      greenmind.broker      ║  Log file        broker.log                          ║
+2026-04-28 11:36:25  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 11:36:25  INFO      greenmind.broker      ║  Paste into React app → Settings → MQTT Broker:     ║
+2026-04-28 11:36:25  INFO      greenmind.broker      ║    Protocol: ws://                                   ║
+2026-04-28 11:36:25  INFO      greenmind.broker      ║    Host:     172.20.10.13                              ║
+2026-04-28 11:36:25  INFO      greenmind.broker      ║    Port:     8883                                      ║
+2026-04-28 11:36:25  INFO      greenmind.broker      ║    Path:     /mqtt                                   ║
+2026-04-28 11:36:25  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 11:36:25  INFO      greenmind.broker      ║  Paste into ESP32 config.py:                         ║
+2026-04-28 11:36:25  INFO      greenmind.broker      ║    MQTT_BROKER = "172.20.10.13"
+2026-04-28 11:36:25  INFO      greenmind.broker      ║    MQTT_PORT   = 1883                                  ║
+2026-04-28 11:36:25  INFO      greenmind.broker      ╚══════════════════════════════════════════════════════╝
+2026-04-28 11:36:25  INFO      greenmind.broker      
+2026-04-28 11:36:25  INFO      amqtt.broker.plugins  Loading plugins from config
+2026-04-28 11:36:25  INFO      amqtt.broker          Listener 'default' bind to 0.0.0.0:1883 (max_connections=50)
+2026-04-28 11:36:25  INFO      websockets.server     server listening on 0.0.0.0:8883
+2026-04-28 11:36:25  INFO      amqtt.broker          Listener 'ws' bind to 0.0.0.0:8883 (max_connections=50)
+2026-04-28 11:36:25  INFO      greenmind.broker      Broker running — press Ctrl+C to stop
+2026-04-28 11:36:25  INFO      amqtt.broker          Starting session expiration monitor.
+2026-04-28 11:36:43  INFO      greenmind.broker      Stopping broker — flushing retained messages
+2026-04-28 11:36:43  INFO      amqtt.broker          Shutting down broker...
+2026-04-28 11:36:43  INFO      websockets.server     server closing
+2026-04-28 11:36:43  INFO      websockets.server     server closed
+2026-04-28 11:36:43  INFO      amqtt.broker          Broker closed
+2026-04-28 11:36:43  INFO      greenmind.broker      Broker stopped. Goodbye.
+2026-04-28 12:02:27  INFO      greenmind.broker      
+2026-04-28 12:02:27  INFO      greenmind.broker      ╔══════════════════════════════════════════════════════╗
+2026-04-28 12:02:27  INFO      greenmind.broker      ║          GreenMind  —  Local MQTT Broker             ║
+2026-04-28 12:02:27  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 12:02:27  INFO      greenmind.broker      ║  TCP  (ESP32)    mqtt://172.20.10.13:1883                ║
+2026-04-28 12:02:27  INFO      greenmind.broker      ║  WS   (Browser)  ws://172.20.10.13:8883 /mqtt            ║
+2026-04-28 12:02:27  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 12:02:27  INFO      greenmind.broker      ║  Topic prefix    greenhouse-19207                    ║
+2026-04-28 12:02:27  INFO      greenmind.broker      ║  Authentication  disabled (open)                     ║
+2026-04-28 12:02:27  INFO      greenmind.broker      ║  Max connections 50                                  ║
+2026-04-28 12:02:27  INFO      greenmind.broker      ║  Log file        broker.log                          ║
+2026-04-28 12:02:27  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 12:02:27  INFO      greenmind.broker      ║  Paste into React app → Settings → MQTT Broker:     ║
+2026-04-28 12:02:27  INFO      greenmind.broker      ║    Protocol: ws://                                   ║
+2026-04-28 12:02:27  INFO      greenmind.broker      ║    Host:     172.20.10.13                              ║
+2026-04-28 12:02:27  INFO      greenmind.broker      ║    Port:     8883                                      ║
+2026-04-28 12:02:27  INFO      greenmind.broker      ║    Path:     /mqtt                                   ║
+2026-04-28 12:02:27  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 12:02:27  INFO      greenmind.broker      ║  Paste into ESP32 config.py:                         ║
+2026-04-28 12:02:27  INFO      greenmind.broker      ║    MQTT_BROKER = "172.20.10.13"
+2026-04-28 12:02:27  INFO      greenmind.broker      ║    MQTT_PORT   = 1883                                  ║
+2026-04-28 12:02:27  INFO      greenmind.broker      ╚══════════════════════════════════════════════════════╝
+2026-04-28 12:02:27  INFO      greenmind.broker      
+2026-04-28 12:02:27  INFO      amqtt.broker.plugins  Loading plugins from config
+2026-04-28 12:02:27  INFO      amqtt.broker          Listener 'default' bind to 0.0.0.0:1883 (max_connections=50)
+2026-04-28 12:02:27  INFO      websockets.server     server listening on 0.0.0.0:8883
+2026-04-28 12:02:27  INFO      amqtt.broker          Listener 'ws' bind to 0.0.0.0:8883 (max_connections=50)
+2026-04-28 12:02:27  INFO      greenmind.broker      Broker running — press Ctrl+C to stop
+2026-04-28 12:02:27  INFO      amqtt.broker          Starting session expiration monitor.
+2026-04-28 12:04:38  INFO      greenmind.broker      Stopping broker — flushing retained messages
+2026-04-28 12:04:38  INFO      amqtt.broker          Shutting down broker...
+2026-04-28 12:04:38  INFO      websockets.server     server closing
+2026-04-28 12:04:38  INFO      websockets.server     server closed
+2026-04-28 12:04:38  INFO      amqtt.broker          Broker closed
+2026-04-28 12:04:38  INFO      greenmind.broker      Broker stopped. Goodbye.
+2026-04-28 12:05:46  INFO      greenmind.broker      
+2026-04-28 12:05:46  INFO      greenmind.broker      ╔══════════════════════════════════════════════════════╗
+2026-04-28 12:05:46  INFO      greenmind.broker      ║          GreenMind  —  Local MQTT Broker             ║
+2026-04-28 12:05:46  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 12:05:46  INFO      greenmind.broker      ║  TCP  (ESP32)    mqtt://192.168.0.49:1883                ║
+2026-04-28 12:05:46  INFO      greenmind.broker      ║  WS   (Browser)  ws://192.168.0.49:8883 /mqtt            ║
+2026-04-28 12:05:46  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 12:05:46  INFO      greenmind.broker      ║  Topic prefix    greenhouse-19207                    ║
+2026-04-28 12:05:46  INFO      greenmind.broker      ║  Authentication  disabled (open)                     ║
+2026-04-28 12:05:46  INFO      greenmind.broker      ║  Max connections 50                                  ║
+2026-04-28 12:05:46  INFO      greenmind.broker      ║  Log file        broker.log                          ║
+2026-04-28 12:05:46  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 12:05:46  INFO      greenmind.broker      ║  Paste into React app → Settings → MQTT Broker:     ║
+2026-04-28 12:05:46  INFO      greenmind.broker      ║    Protocol: ws://                                   ║
+2026-04-28 12:05:46  INFO      greenmind.broker      ║    Host:     192.168.0.49                              ║
+2026-04-28 12:05:46  INFO      greenmind.broker      ║    Port:     8883                                      ║
+2026-04-28 12:05:46  INFO      greenmind.broker      ║    Path:     /mqtt                                   ║
+2026-04-28 12:05:46  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-04-28 12:05:46  INFO      greenmind.broker      ║  Paste into ESP32 config.py:                         ║
+2026-04-28 12:05:46  INFO      greenmind.broker      ║    MQTT_BROKER = "192.168.0.49"
+2026-04-28 12:05:46  INFO      greenmind.broker      ║    MQTT_PORT   = 1883                                  ║
+2026-04-28 12:05:46  INFO      greenmind.broker      ╚══════════════════════════════════════════════════════╝
+2026-04-28 12:05:46  INFO      greenmind.broker      
+2026-04-28 12:05:46  INFO      amqtt.broker.plugins  Loading plugins from config
+2026-04-28 12:05:47  INFO      amqtt.broker          Listener 'default' bind to 0.0.0.0:1883 (max_connections=50)
+2026-04-28 12:05:47  INFO      websockets.server     server listening on 0.0.0.0:8883
+2026-04-28 12:05:47  INFO      amqtt.broker          Listener 'ws' bind to 0.0.0.0:8883 (max_connections=50)
+2026-04-28 12:05:47  INFO      greenmind.broker      Broker running — press Ctrl+C to stop
+2026-04-28 12:05:47  INFO      amqtt.broker          Starting session expiration monitor.
+2026-04-28 12:05:48  INFO      amqtt.broker          Listener 'default': 1/50 connections acquired
+2026-04-28 12:05:48  INFO      amqtt.broker          Connection from 192.168.0.5:63325 on listener 'default'
+2026-04-28 12:05:48  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 12:05:51  INFO      websockets.server     connection open
+2026-04-28 12:05:51  INFO      amqtt.broker          Listener 'ws': 1/50 connections acquired
+2026-04-28 12:05:51  INFO      amqtt.broker          Connection from 192.168.0.49:57407 on listener 'ws'
+2026-04-28 12:05:52  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 12:06:10  WARNING   amqtt.mqtt.protocol.handler  BrokerProtocolHandler Unhandled exception in reader coro: error('unpack requires a buffer of 1 bytes')
+2026-04-28 12:06:10  INFO      amqtt.broker          Listener 'ws': 0/50 connections acquired
+2026-04-28 12:06:10  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 12:06:12  INFO      websockets.server     connection open
+2026-04-28 12:06:12  INFO      amqtt.broker          Listener 'ws': 1/50 connections acquired
+2026-04-28 12:06:12  INFO      amqtt.broker          Connection from 192.168.0.49:51054 on listener 'ws'
+2026-04-28 12:06:12  INFO      websockets.server     connection open
+2026-04-28 12:06:12  INFO      amqtt.broker          Listener 'ws': 2/50 connections acquired
+2026-04-28 12:06:13  INFO      amqtt.broker          Connection from 192.168.0.49:51055 on listener 'ws'
+2026-04-28 12:06:13  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 12:06:13  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 12:24:47  INFO      amqtt.broker          Listener 'ws': 1/50 connections acquired
+2026-04-28 12:24:47  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 12:24:47  INFO      websockets.server     connection open
+2026-04-28 12:24:47  INFO      amqtt.broker          Listener 'ws': 2/50 connections acquired
+2026-04-28 12:24:47  INFO      amqtt.broker          Connection from 192.168.0.49:63500 on listener 'ws'
+2026-04-28 12:24:47  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 12:55:21  INFO      amqtt.broker          Listener 'default': 2/50 connections acquired
+2026-04-28 12:55:21  INFO      amqtt.broker          Connection from 192.168.0.5:56409 on listener 'default'
+2026-04-28 12:55:21  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 12:56:38  INFO      amqtt.broker          Listener 'default': 3/50 connections acquired
+2026-04-28 12:56:38  INFO      amqtt.broker          Connection from 192.168.0.5:53866 on listener 'default'
+2026-04-28 12:56:38  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 13:00:15  INFO      websockets.server     connection open
+2026-04-28 13:00:15  INFO      amqtt.broker          Listener 'ws': 3/50 connections acquired
+2026-04-28 13:00:15  INFO      amqtt.broker          Connection from 192.168.0.49:55304 on listener 'ws'
+2026-04-28 13:00:15  INFO      websockets.server     connection open
+2026-04-28 13:00:15  INFO      amqtt.broker          Listener 'ws': 4/50 connections acquired
+2026-04-28 13:00:15  INFO      amqtt.broker          Connection from 192.168.0.49:55305 on listener 'ws'
+2026-04-28 13:00:15  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 13:00:15  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 13:06:53  INFO      amqtt.broker          Listener 'default': 4/50 connections acquired
+2026-04-28 13:06:53  INFO      amqtt.broker          Connection from 192.168.0.5:65482 on listener 'default'
+2026-04-28 13:06:53  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-04-28 13:07:47  WARNING   amqtt.mqtt.protocol.handler  BrokerProtocolHandler Unhandled exception in reader coro: error('unpack requires a buffer of 1 bytes')
+2026-04-28 13:07:47  WARNING   amqtt.mqtt.protocol.handler  BrokerProtocolHandler Unhandled exception in reader coro: error('unpack requires a buffer of 1 bytes')
+2026-04-28 13:07:47  INFO      amqtt.broker          Listener 'ws': 3/50 connections acquired
+2026-04-28 13:07:47  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 13:07:47  INFO      amqtt.broker          Listener 'ws': 2/50 connections acquired
+2026-04-28 13:07:47  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 13:07:47  WARNING   amqtt.mqtt.protocol.handler  BrokerProtocolHandler Unhandled exception in reader coro: error('unpack requires a buffer of 1 bytes')
+2026-04-28 13:07:47  WARNING   amqtt.mqtt.protocol.handler  BrokerProtocolHandler Unhandled exception in reader coro: error('unpack requires a buffer of 1 bytes')
+2026-04-28 13:07:48  INFO      amqtt.broker          Listener 'ws': 1/50 connections acquired
+2026-04-28 13:07:48  INFO      amqtt.broker          Listener 'ws': 0/50 connections acquired
+2026-04-28 13:07:48  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 13:07:48  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 13:07:58  WARNING   amqtt.mqtt.protocol.handler  BrokerProtocolHandler Unhandled exception in reader coro: OSError(22, 'The semaphore timeout period has expired', None, 121, None)
+2026-04-28 13:07:58  INFO      amqtt.broker          Listener 'default': 3/50 connections acquired
+2026-04-28 13:07:58  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 13:08:16  INFO      greenmind.broker      Stopping broker — flushing retained messages
+2026-04-28 13:08:16  INFO      amqtt.broker          Shutting down broker...
+2026-04-28 13:46:30  WARNING   amqtt.mqtt.protocol.handler  BrokerProtocolHandler Unhandled exception in reader coro: ConnectionAbortedError(22, 'The network connection was aborted by the local system', None, 1236, None)
+2026-04-28 13:46:30  WARNING   amqtt.mqtt.protocol.handler  BrokerProtocolHandler Unhandled exception in reader coro: ConnectionAbortedError(22, 'The network connection was aborted by the local system', None, 1236, None)
+2026-04-28 13:46:30  WARNING   amqtt.mqtt.protocol.handler  BrokerProtocolHandler Unhandled exception in reader coro: ConnectionAbortedError(22, 'The network connection was aborted by the local system', None, 1236, None)
+2026-04-28 13:46:30  INFO      websockets.server     server closing
+2026-04-28 13:46:31  INFO      websockets.server     server closed
+2026-04-28 13:46:31  INFO      amqtt.broker          Listener 'default': 2/50 connections acquired
+2026-04-28 13:46:31  INFO      amqtt.broker          Listener 'default': 1/50 connections acquired
+2026-04-28 13:46:31  INFO      amqtt.broker          Listener 'default': 0/50 connections acquired
+2026-04-28 13:46:31  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 13:46:31  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 13:46:31  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-04-28 13:46:32  WARNING   amqtt.broker          3 messages not broadcasted
+2026-04-28 13:46:32  INFO      amqtt.broker          Broker closed
+2026-04-28 13:46:33  INFO      greenmind.broker      Broker stopped. Goodbye.

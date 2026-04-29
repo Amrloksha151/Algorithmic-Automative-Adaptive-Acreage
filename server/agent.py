@@ -11,6 +11,18 @@ from key_vault import clear_keys, get_keys, public_status, set_keys
 
 RUN_HISTORY: Deque[Dict[str, Any]] = deque(maxlen=50)
 
+PWM_DEVICES = {
+    'cooling_fan',
+    'ventilation_fan',
+    'led_strip',
+    'pump_12v',
+}
+
+DIGITAL_DEVICES = {
+    'pump_5v',
+    'mist_maker',
+}
+
 KNOWN_DEVICES = {
     'cooling_fan',
     'ventilation_fan',
@@ -194,7 +206,7 @@ async def _tool_validate_controls(arguments: Dict[str, Any], context: Dict[str, 
             continue
 
         value = control.get('value')
-        if device in {'cooling_fan', 'ventilation_fan', 'led_strip'}:
+        if device in PWM_DEVICES:
             try:
                 value = max(0, min(100, int(float(value))))
             except (TypeError, ValueError):
@@ -259,6 +271,8 @@ async def _run_openai_agent(
         'Do not guess hidden state. Prefer safe, bounded actions. '
         'When ready, return a JSON object with mode, reason, controls, and optional observations. '
         'Controls must be a list of {device, value} items. '
+        'PWM devices are cooling_fan, ventilation_fan, led_strip, and pump_12v and must use 0-100 values. '
+        'Digital devices are pump_5v and mist_maker and must use 0 or 1 values. '
         'Before finalizing, validate proposed controls with the validate_controls tool.'
     )
     user_prompt = _json({
@@ -269,6 +283,8 @@ async def _run_openai_agent(
             'manual_override_authoritative': True,
             'pwm_range': [0, 100],
             'binary_range': [0, 1],
+            'pwm_devices': sorted(PWM_DEVICES),
+            'digital_devices': sorted(DIGITAL_DEVICES),
         },
     })
 
@@ -348,6 +364,8 @@ async def _run_google_agent(
         'Do not guess hidden state. Prefer safe, bounded actions. '
         'When ready, return a JSON object with mode, reason, controls, and optional observations. '
         'Controls must be a list of {device, value} items. '
+        'PWM devices are cooling_fan, ventilation_fan, led_strip, and pump_12v and must use 0-100 values. '
+        'Digital devices are pump_5v and mist_maker and must use 0 or 1 values. '
         'Before finalizing, validate proposed controls with the validate_controls tool.'
     )
     user_content = _json({
@@ -358,6 +376,8 @@ async def _run_google_agent(
             'manual_override_authoritative': True,
             'pwm_range': [0, 100],
             'binary_range': [0, 1],
+            'pwm_devices': sorted(PWM_DEVICES),
+            'digital_devices': sorted(DIGITAL_DEVICES),
         },
     })
 

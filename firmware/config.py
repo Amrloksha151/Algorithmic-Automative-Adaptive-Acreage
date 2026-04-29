@@ -10,7 +10,7 @@ WIFI_PASSWORD = "AAAA@19207"
 # ── MQTT broker ───────────────────────────────────────────────
 MQTT_BROKER   = "192.168.0.49"   # or your local broker IP
 MQTT_PORT     = 1883
-MQTT_CLIENT_ID= "greenmind-esp32s3"
+MQTT_CLIENT_ID= "AAAA-esp32s3"
 
 # Topic prefix — must match your React dashboard setting
 TOPIC_PREFIX  = "greenhouse"

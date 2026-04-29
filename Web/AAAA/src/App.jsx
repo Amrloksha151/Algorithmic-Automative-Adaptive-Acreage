@@ -214,12 +214,12 @@ const controlGroups = [
   { name: 'Cooling Fan', device: 'cooling_fan', icon: Zap, value: 80 },
   { name: 'Ventilation Fan', device: 'ventilation_fan', icon: MoonStar, value: 52 },
   { name: 'LED Grow Light', device: 'led_strip', icon: SunMedium, value: 66 },
+  { name: '12V Water Pump', device: 'pump_12v', icon: Cpu, value: 0 },
 ]
 
 const toggleGroups = [
   { name: 'Irrigation Pump', device: 'pump_5v', icon: Droplets, on: true },
   { name: 'Mist Maker', device: 'mist_maker', icon: WifiOff, on: false },
-  { name: '12V Water Pump', device: 'pump_12v', icon: Cpu, on: true },
 ]
 
 const agentMessages = [
@@ -526,7 +526,9 @@ function App() {
     const ledStrip = lightGap > 0 ? Math.max(0, Math.min(100, Math.round(Math.min(100, 30 + (lightGap * 12) + Math.max(0, -lightRate * 10))))) : 0
     const irrigationPump = soilGap > 0 || soilRate < -0.1 ? 1 : 0
     const mistMaker = humidityGap > 2 || humidityRate < -0.15 ? 1 : 0
-    const waterPump = temperatureGap > 1.5 || temperatureRate > 0.15 ? 1 : 0
+    const waterPump = temperatureGap > 1.5 || temperatureRate > 0.15
+      ? Math.max(35, Math.min(100, Math.round((temperatureGap * 18) + (temperatureRate * 120) + 35)))
+      : 0
 
     const nextRecommendation = {
       mode: 'autonomous',
