@@ -52,11 +52,16 @@ function App() {
     environment: true, keys: false, mqtt: false, database: false 
   })
 
-  // -- Data State --
+  // -- Data State & Refs --
   const [sensorValues, setSensorValues] = useState(sensorDefaults)
   const [telemetryHistory, setTelemetryHistory] = useState([])
   const [pwmValues, setPwmValues] = useState(controlGroups)
   const [toggleValues, setToggleValues] = useState(toggleGroups)
+  
+  const latestTelemetryRef = useRef(null)
+  useEffect(() => {
+    latestTelemetryRef.current = telemetryHistory[telemetryHistory.length - 1]
+  }, [telemetryHistory])
 
   // -- Settings State --
   const [environment, setEnvironment] = useState(() => 
@@ -213,7 +218,7 @@ function App() {
     if (isAgentRunning) return
     setIsAgentRunning(true)
     try {
-      const latestTelemetry = telemetryHistory[telemetryHistory.length - 1]
+      const latestTelemetry = latestTelemetryRef.current
       const result = await runAgriAgent({
         provider: aiSettings.provider,
         keys: aiSettings.keys,
@@ -236,169 +241,160 @@ function App() {
     humidity: { phase: 'idle', power: 0 },
     soil: { phase: 'idle', power: 0 }
   })
+  const autopilotStatusRef = useRef(autopilotStatus)
+  useEffect(() => { autopilotStatusRef.current = autopilotStatus }, [autopilotStatus])
+
   const analysisDataRef = useRef({
     temperature: { startTime: null, startValue: null },
     ventilation: { startTime: null, startValue: null }
   })
   const lastPresetRef = useRef(environment.activePreset)
 
-  // 6. Autopilot Logic (Reactive & Consultation)
+  // 6. Concurrent Autopilot Engine
   useEffect(() => {
-    if (!aiSettings.autopilotActive || connectionState !== 'connected') {
-      if (autopilotTimerRef.current) clearInterval(autopilotTimerRef.current)
-      return
-    }
+    let isActive = true
+    if (!aiSettings.autopilotActive || connectionState !== 'connected') return
 
-    // Trigger full recovery on preset switch
+    // Trigger recovery on preset switch
     if (lastPresetRef.current !== environment.activePreset) {
       lastPresetRef.current = environment.activePreset
       setAutopilotStatus({
         temperature: { phase: 'recovery', power: 100 },
         ventilation: { phase: 'recovery', power: 100 },
-        humidity: { phase: 'recovery', power: 1 }, // Digital ON
-        soil: { phase: 'recovery', power: 1 }      // Digital ON
+        humidity: { phase: 'recovery', power: 1 },
+        soil: { phase: 'recovery', power: 1 }
       })
-      // Send immediate commands
       publishCommand('cooling_fan', 100, 'Preset switch recovery', 'autopilot')
       publishCommand('ventilation_fan', 100, 'Preset switch recovery', 'autopilot')
       publishCommand('mist_maker', 1, 'Preset switch recovery', 'autopilot')
       publishCommand('pump_5v', 1, 'Preset switch recovery', 'autopilot')
     }
 
-    const runReactiveCycle = async () => {
-      const latest = telemetryHistory[telemetryHistory.length - 1]
-      if (!latest) return
+    // A. Reactive Cycle (Concurrent Async Loop)
+    const reactiveLoop = async () => {
+      while (isActive) {
+        const latest = latestTelemetryRef.current
+        if (!latest) {
+          await new Promise(r => setTimeout(r, 1000))
+          continue
+        }
 
-      setAutopilotStatus(currentStatus => {
-        const nextStatus = { ...currentStatus }
+        const currentStatus = autopilotStatusRef.current
+        let nextStatus = { ...currentStatus }
         let changed = false
 
-        // --- TEMPERATURE (Cooling Fan) ---
-        // Trigger recovery if out of bounds OR if it's a new preset switch
-        if (latest.temperature > environment.temperature.max && (nextStatus.temperature.phase === 'idle' || nextStatus.temperature.phase === 'steady')) {
+        // --- TEMPERATURE ---
+        if (latest.temperature > environment.temperature.max && (currentStatus.temperature.phase === 'idle' || currentStatus.temperature.phase === 'steady')) {
           nextStatus.temperature = { phase: 'recovery', power: 100 }
           publishCommand('cooling_fan', 100, 'Over temperature limit', 'autopilot')
           changed = true
-        } else if (nextStatus.temperature.phase === 'recovery' && latest.temperature <= environment.temperature.target) {
+        } else if (currentStatus.temperature.phase === 'recovery' && latest.temperature <= environment.temperature.target) {
           nextStatus.temperature = { phase: 'analysis', power: 0 }
           analysisDataRef.current.temperature = { startTime: Date.now(), startValue: latest.temperature }
           publishCommand('cooling_fan', 0, 'Target reached, entering analysis', 'autopilot')
           changed = true
-        } else if (nextStatus.temperature.phase === 'analysis') {
+        } else if (currentStatus.temperature.phase === 'analysis') {
           const elapsed = (Date.now() - analysisDataRef.current.temperature.startTime) / 1000
           if (elapsed >= 20) {
             const rate = (latest.temperature - analysisDataRef.current.temperature.startValue) / (elapsed / 60)
             nextStatus.temperature = { phase: 'requesting_ai', power: 0 }
-            changed = true
-            // Launch async AI request (will update status again on completion)
-            runAgriAgent({
-              provider: aiSettings.provider,
-              keys: aiSettings.keys,
-              telemetry: latest,
-              environment,
-              task: 'steady_state',
-              context: { device: 'cooling_fan', rateOfChange: rate },
-              publishCommand: (d, v, r) => publishCommand(d, v, r, 'autopilot')
-            }).then(result => {
+            setAutopilotStatus(prev => ({ ...prev, temperature: { phase: 'requesting_ai', power: 0 } }))
+            try {
+              const result = await runAgriAgent({
+                provider: aiSettings.provider, keys: aiSettings.keys, telemetry: latest, environment,
+                task: 'steady_state', context: { device: 'cooling_fan', rateOfChange: rate },
+                publishCommand: (d, v, r) => publishCommand(d, v, r, 'autopilot')
+              })
               setAgentOutput(result)
               const aiAction = result.actions.find(a => a.device === 'cooling_fan')
-              setAutopilotStatus(prev => ({ 
-                ...prev, 
-                temperature: { phase: 'steady', power: aiAction ? aiAction.value : 0 } 
-              }))
-            }).catch(() => {
+              setAutopilotStatus(prev => ({ ...prev, temperature: { phase: 'steady', power: aiAction ? aiAction.value : 0 } }))
+            } catch (err) {
+              console.error('AI Error (Temp):', err)
               setAutopilotStatus(prev => ({ ...prev, temperature: { phase: 'idle', power: 0 } }))
-            })
+            }
           }
         }
 
         // --- VENTILATION ---
-        if (latest.temperature < environment.temperature.min && (nextStatus.ventilation.phase === 'idle' || nextStatus.ventilation.phase === 'steady')) {
-            nextStatus.ventilation = { phase: 'recovery', power: 100 }
-            publishCommand('ventilation_fan', 100, 'Under temperature limit', 'autopilot')
-            changed = true
-        } else if (nextStatus.ventilation.phase === 'recovery' && latest.temperature >= environment.temperature.target) {
-            nextStatus.ventilation = { phase: 'analysis', power: 0 }
-            analysisDataRef.current.ventilation = { startTime: Date.now(), startValue: latest.temperature }
-            publishCommand('ventilation_fan', 0, 'Target reached, entering analysis', 'autopilot')
-            changed = true
-        } else if (nextStatus.ventilation.phase === 'analysis') {
+        if (latest.temperature < environment.temperature.min && (currentStatus.ventilation.phase === 'idle' || currentStatus.ventilation.phase === 'steady')) {
+          nextStatus.ventilation = { phase: 'recovery', power: 100 }
+          publishCommand('ventilation_fan', 100, 'Under temperature limit', 'autopilot')
+          changed = true
+        } else if (currentStatus.ventilation.phase === 'recovery' && latest.temperature >= environment.temperature.target) {
+          nextStatus.ventilation = { phase: 'analysis', power: 0 }
+          analysisDataRef.current.ventilation = { startTime: Date.now(), startValue: latest.temperature }
+          publishCommand('ventilation_fan', 0, 'Target reached, entering analysis', 'autopilot')
+          changed = true
+        } else if (currentStatus.ventilation.phase === 'analysis') {
           const elapsed = (Date.now() - analysisDataRef.current.ventilation.startTime) / 1000
           if (elapsed >= 20) {
             const rate = (latest.temperature - analysisDataRef.current.ventilation.startValue) / (elapsed / 60)
             nextStatus.ventilation = { phase: 'requesting_ai', power: 0 }
-            changed = true
-            runAgriAgent({
-              provider: aiSettings.provider,
-              keys: aiSettings.keys,
-              telemetry: latest,
-              environment,
-              task: 'steady_state',
-              context: { device: 'ventilation_fan', rateOfChange: rate },
-              publishCommand: (d, v, r) => publishCommand(d, v, r, 'autopilot')
-            }).then(result => {
+            setAutopilotStatus(prev => ({ ...prev, ventilation: { phase: 'requesting_ai', power: 0 } }))
+            try {
+              const result = await runAgriAgent({
+                provider: aiSettings.provider, keys: aiSettings.keys, telemetry: latest, environment,
+                task: 'steady_state', context: { device: 'ventilation_fan', rateOfChange: rate },
+                publishCommand: (d, v, r) => publishCommand(d, v, r, 'autopilot')
+              })
               setAgentOutput(result)
               const aiAction = result.actions.find(a => a.device === 'ventilation_fan')
-              setAutopilotStatus(prev => ({ 
-                ...prev, 
-                ventilation: { phase: 'steady', power: aiAction ? aiAction.value : 0 } 
-              }))
-            }).catch(() => {
+              setAutopilotStatus(prev => ({ ...prev, ventilation: { phase: 'steady', power: aiAction ? aiAction.value : 0 } }))
+            } catch (err) {
               setAutopilotStatus(prev => ({ ...prev, ventilation: { phase: 'idle', power: 0 } }))
-            })
+            }
           }
         }
 
-        // --- HUMIDITY (Mist Maker) & SOIL (Irrigation) ---
-        if (latest.humidity < environment.humidity.min && nextStatus.humidity.power === 0) {
+        // --- HUMIDITY & SOIL ---
+        if (latest.humidity < environment.humidity.min && currentStatus.humidity.power === 0) {
           nextStatus.humidity = { phase: 'recovering', power: 1 }
           publishCommand('mist_maker', 1, 'Below humidity limit', 'autopilot')
           changed = true
-        } else if (latest.humidity >= environment.humidity.target && nextStatus.humidity.power === 1) {
+        } else if (latest.humidity >= environment.humidity.target && currentStatus.humidity.power === 1) {
           nextStatus.humidity = { phase: 'idle', power: 0 }
           publishCommand('mist_maker', 0, 'Humidity target reached', 'autopilot')
           changed = true
         }
 
-        if (latest.soil < environment.soil.min && nextStatus.soil.power === 0) {
+        if (latest.soil < environment.soil.min && currentStatus.soil.power === 0) {
           nextStatus.soil = { phase: 'recovering', power: 1 }
           publishCommand('pump_5v', 1, 'Below soil moisture limit', 'autopilot')
           changed = true
-        } else if (latest.soil >= environment.soil.target && nextStatus.soil.power === 1) {
+        } else if (latest.soil >= environment.soil.target && currentStatus.soil.power === 1) {
           nextStatus.soil = { phase: 'idle', power: 0 }
           publishCommand('pump_5v', 0, 'Soil target reached', 'autopilot')
           changed = true
         }
 
-        return changed ? nextStatus : currentStatus
-      })
+        if (changed) setAutopilotStatus(nextStatus)
+        await new Promise(r => setTimeout(r, 5000))
+      }
     }
 
-    // Consultation Cycle (10 Minutes)
-    const runConsultation = async () => {
-      const latest = telemetryHistory[telemetryHistory.length - 1]
-      if (!latest) return
-      try {
-        const result = await runAgriAgent({
-          provider: aiSettings.provider,
-          keys: aiSettings.keys,
-          telemetry: latest,
-          environment,
-          task: 'consultation',
-          publishCommand: (d, v, r) => publishCommand(d, v, r, 'autopilot')
-        })
-        setAgentOutput(result)
-      } catch (err) { console.error('AI Consultation Error:', err) }
+    // B. Consultation Cycle
+    const consultationLoop = async () => {
+      while (isActive) {
+        await new Promise(r => setTimeout(r, 600000)) // Wait 10 mins first
+        if (!isActive) break
+        const latest = latestTelemetryRef.current
+        if (latest) {
+          try {
+            const result = await runAgriAgent({
+              provider: aiSettings.provider, keys: aiSettings.keys, telemetry: latest, environment,
+              task: 'consultation', publishCommand: (d, v, r) => publishCommand(d, v, r, 'autopilot')
+            })
+            setAgentOutput(result)
+          } catch (err) { console.error('Consultation AI Error:', err) }
+        }
+      }
     }
 
-    const reactiveInterval = setInterval(runReactiveCycle, 5000)
-    const consultationInterval = setInterval(runConsultation, 600000) // 10 mins
+    reactiveLoop()
+    consultationLoop()
 
-    return () => {
-      clearInterval(reactiveInterval)
-      clearInterval(consultationInterval)
-    }
-  }, [aiSettings.autopilotActive, connectionState, environment, aiSettings.keys, aiSettings.provider, publishCommand, telemetryHistory, autopilotStatus])
+    return () => { isActive = false }
+  }, [aiSettings.autopilotActive, connectionState, environment, aiSettings.keys, aiSettings.provider, publishCommand])
 
   // 7. DB Initialization Handler
   const handleInitDB = async () => {

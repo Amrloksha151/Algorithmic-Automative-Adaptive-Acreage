@@ -45,33 +45,21 @@ export async function runAgriAgent({ provider, keys, telemetry, environment, tas
 }
 
 async function runGoogleAgent(apiKey, telemetry, environment, task, context, publishCommand) {
-  const genAI = new GoogleGenAI({ apiKey })
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    systemInstruction: SYSTEM_PROMPT,
-  })
+  const ai = new GoogleGenAI({ apiKey })
 
-  const tools = [
-    {
-      functionDeclarations: [
-        {
-          name: 'update_actuator',
-          description: 'Adjust a greenhouse actuator',
-          parameters: {
-            type: 'object',
-            properties: {
-              device: { type: 'string' },
-              value: { type: 'number' },
-              reason: { type: 'string' },
-            },
-            required: ['device', 'value', 'reason'],
-          },
-        },
-      ],
+  const updateActuatorDeclaration = {
+    name: 'update_actuator',
+    description: 'Adjust a greenhouse actuator',
+    parameters: {
+      type: 'object',
+      properties: {
+        device: { type: 'string', description: 'Device ID' },
+        value: { type: 'number', description: 'Power value (0-100 or 0/1)' },
+        reason: { type: 'string', description: 'Why this change is made' },
+      },
+      required: ['device', 'value', 'reason'],
     },
-  ]
-
-  const chat = model.startChat({ tools, history: [] })
+  };
 
   let prompt = `Current Telemetry: ${JSON.stringify(telemetry)}
 Environment Targets: ${JSON.stringify(environment)}
@@ -84,13 +72,18 @@ Task: ${task}
     prompt += `Please review the state and optimize conditions.`
   }
 
-  const result = await chat.sendMessage(prompt)
-  const response = await result.response
-  const calls = response.functionCalls()
+  const response = await ai.models.generateContent({
+    model: 'gemini-1.5-flash',
+    systemInstruction: SYSTEM_PROMPT,
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    config: {
+      tools: [{ functionDeclarations: [updateActuatorDeclaration] }],
+    },
+  })
 
   const actions = []
-  if (calls) {
-    for (const call of calls) {
+  if (response.functionCalls) {
+    for (const call of response.functionCalls) {
       if (call.name === 'update_actuator') {
         const { device, value, reason } = call.args
         const success = publishCommand(device, value, reason)
@@ -99,7 +92,7 @@ Task: ${task}
     }
   }
 
-  return { text: response.text(), actions }
+  return { text: response.text || 'Adjustments suggested via tools.', actions }
 }
 
 async function runOpenAIAgent(apiKey, telemetry, environment, task, context, publishCommand) {
