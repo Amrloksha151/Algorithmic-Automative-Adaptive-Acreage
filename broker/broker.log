@@ -327,3 +327,124 @@
 2026-05-02 15:55:58  INFO      websockets.server     server closed
 2026-05-02 15:55:58  INFO      amqtt.broker          Broker closed
 2026-05-02 15:55:58  INFO      greenmind.broker      Broker stopped. Goodbye.
+2026-05-02 20:30:31  INFO      greenmind.broker      
+2026-05-02 20:30:31  INFO      greenmind.broker      ╔══════════════════════════════════════════════════════╗
+2026-05-02 20:30:31  INFO      greenmind.broker      ║          GreenMind  —  Local MQTT Broker             ║
+2026-05-02 20:30:31  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-05-02 20:30:31  INFO      greenmind.broker      ║  TCP  (ESP32)    mqtt://192.168.1.3:1883                ║
+2026-05-02 20:30:31  INFO      greenmind.broker      ║  WS   (Browser)  ws://192.168.1.3:8883 /mqtt            ║
+2026-05-02 20:30:31  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-05-02 20:30:31  INFO      greenmind.broker      ║  Topic prefix    greenhouse-19207                    ║
+2026-05-02 20:30:31  INFO      greenmind.broker      ║  Authentication  disabled (open)                     ║
+2026-05-02 20:30:31  INFO      greenmind.broker      ║  Max connections 50                                  ║
+2026-05-02 20:30:31  INFO      greenmind.broker      ║  Log file        broker.log                          ║
+2026-05-02 20:30:31  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-05-02 20:30:31  INFO      greenmind.broker      ║  Paste into React app → Settings → MQTT Broker:     ║
+2026-05-02 20:30:31  INFO      greenmind.broker      ║    Protocol: ws://                                   ║
+2026-05-02 20:30:31  INFO      greenmind.broker      ║    Host:     192.168.1.3                               ║
+2026-05-02 20:30:31  INFO      greenmind.broker      ║    Port:     8883                                      ║
+2026-05-02 20:30:31  INFO      greenmind.broker      ║    Path:     /mqtt                                   ║
+2026-05-02 20:30:31  INFO      greenmind.broker      ╠══════════════════════════════════════════════════════╣
+2026-05-02 20:30:31  INFO      greenmind.broker      ║  Paste into ESP32 config.py:                         ║
+2026-05-02 20:30:31  INFO      greenmind.broker      ║    MQTT_BROKER = "192.168.1.3"
+2026-05-02 20:30:31  INFO      greenmind.broker      ║    MQTT_PORT   = 1883                                  ║
+2026-05-02 20:30:31  INFO      greenmind.broker      ╚══════════════════════════════════════════════════════╝
+2026-05-02 20:30:31  INFO      greenmind.broker      
+2026-05-02 20:30:31  INFO      amqtt.broker.plugins  Loading plugins from config
+2026-05-02 20:30:32  INFO      amqtt.broker          Listener 'default' bind to 0.0.0.0:1883 (max_connections=50)
+2026-05-02 20:30:32  INFO      websockets.server     server listening on 0.0.0.0:8883
+2026-05-02 20:30:32  INFO      amqtt.broker          Listener 'ws' bind to 0.0.0.0:8883 (max_connections=50)
+2026-05-02 20:30:32  INFO      greenmind.broker      Broker running — press Ctrl+C to stop
+2026-05-02 20:30:32  INFO      amqtt.broker          Starting session expiration monitor.
+2026-05-02 20:31:19  INFO      amqtt.broker          Listener 'default': 1/50 connections acquired
+2026-05-02 20:31:19  INFO      amqtt.broker          Connection from 192.168.1.3:60039 on listener 'default'
+2026-05-02 20:31:19  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-05-02 20:33:09  INFO      websockets.server     connection open
+2026-05-02 20:33:09  INFO      amqtt.broker          Listener 'ws': 1/50 connections acquired
+2026-05-02 20:33:09  INFO      amqtt.broker          Connection from 192.168.1.3:57809 on listener 'ws'
+2026-05-02 20:33:09  ERROR     websockets.server     connection handler failed
+Traceback (most recent call last):
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\websockets\asyncio\server.py", line 376, in conn_handler
+    await self.handler(connection)
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\broker.py", line 427, in ws_connected
+    await self._client_connected(listener_name, WebSocketsReader(websocket), WebSocketsWriter(websocket))
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\broker.py", line 453, in _client_connected
+    handler, client_session = await self._initialize_client_session(reader, writer, remote_address, remote_port)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\broker.py", line 477, in _initialize_client_session
+    handler, client_session = await BrokerProtocolHandler.init_from_connect(reader, writer, self.plugins_manager)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\mqtt\protocol\broker_handler.py", line 166, in init_from_connect
+    connect = await ConnectPacket.from_stream(reader)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\mqtt\packet.py", line 237, in from_stream
+    fixed_header = await cls.FIXED_HEADER.from_stream(reader)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\mqtt\packet.py", line 104, in from_stream
+    int1 = unpack("!B", byte1)[0]
+           ~~~~~~^^^^^^^^^^^^^
+struct.error: unpack requires a buffer of 1 bytes
+2026-05-02 20:33:22  INFO      websockets.server     connection open
+2026-05-02 20:33:23  INFO      amqtt.broker          Listener 'ws': 2/50 connections acquired
+2026-05-02 20:33:23  INFO      amqtt.broker          Connection from 192.168.1.3:55780 on listener 'ws'
+2026-05-02 20:33:23  ERROR     websockets.server     connection handler failed
+Traceback (most recent call last):
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\websockets\asyncio\server.py", line 376, in conn_handler
+    await self.handler(connection)
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\broker.py", line 427, in ws_connected
+    await self._client_connected(listener_name, WebSocketsReader(websocket), WebSocketsWriter(websocket))
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\broker.py", line 453, in _client_connected
+    handler, client_session = await self._initialize_client_session(reader, writer, remote_address, remote_port)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\broker.py", line 477, in _initialize_client_session
+    handler, client_session = await BrokerProtocolHandler.init_from_connect(reader, writer, self.plugins_manager)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\mqtt\protocol\broker_handler.py", line 166, in init_from_connect
+    connect = await ConnectPacket.from_stream(reader)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\mqtt\packet.py", line 237, in from_stream
+    fixed_header = await cls.FIXED_HEADER.from_stream(reader)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\mqtt\packet.py", line 104, in from_stream
+    int1 = unpack("!B", byte1)[0]
+           ~~~~~~^^^^^^^^^^^^^
+struct.error: unpack requires a buffer of 1 bytes
+2026-05-02 20:33:50  INFO      websockets.server     connection open
+2026-05-02 20:33:50  INFO      amqtt.broker          Listener 'ws': 3/50 connections acquired
+2026-05-02 20:33:50  INFO      amqtt.broker          Connection from 192.168.1.3:52916 on listener 'ws'
+2026-05-02 20:33:50  ERROR     websockets.server     connection handler failed
+Traceback (most recent call last):
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\websockets\asyncio\server.py", line 376, in conn_handler
+    await self.handler(connection)
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\broker.py", line 427, in ws_connected
+    await self._client_connected(listener_name, WebSocketsReader(websocket), WebSocketsWriter(websocket))
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\broker.py", line 453, in _client_connected
+    handler, client_session = await self._initialize_client_session(reader, writer, remote_address, remote_port)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\broker.py", line 477, in _initialize_client_session
+    handler, client_session = await BrokerProtocolHandler.init_from_connect(reader, writer, self.plugins_manager)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\mqtt\protocol\broker_handler.py", line 166, in init_from_connect
+    connect = await ConnectPacket.from_stream(reader)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\mqtt\packet.py", line 237, in from_stream
+    fixed_header = await cls.FIXED_HEADER.from_stream(reader)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "F:\Algorithmic-Automative-Adaptive-Acreage\broker\dev_env\Lib\site-packages\amqtt\mqtt\packet.py", line 104, in from_stream
+    int1 = unpack("!B", byte1)[0]
+           ~~~~~~^^^^^^^^^^^^^
+struct.error: unpack requires a buffer of 1 bytes
+2026-05-02 20:33:54  INFO      websockets.server     connection open
+2026-05-02 20:33:54  INFO      amqtt.broker          Listener 'ws': 4/50 connections acquired
+2026-05-02 20:33:54  INFO      amqtt.broker          Connection from 192.168.1.3:49672 on listener 'ws'
+2026-05-02 20:33:54  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_connected' EVENT FIRED ###
+2026-05-02 20:39:34  INFO      amqtt.broker          Listener 'default': 0/50 connections acquired
+2026-05-02 20:39:34  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-05-02 20:42:10  INFO      greenmind.broker      Stopping broker — flushing retained messages
+2026-05-02 20:42:10  INFO      amqtt.broker          Shutting down broker...
+2026-05-02 20:42:10  INFO      amqtt.broker          Listener 'ws': 3/50 connections acquired
+2026-05-02 20:42:10  INFO      amqtt.broker.plugins.EventLoggerPlugin  ### 'on_broker_client_disconnected' EVENT FIRED ###
+2026-05-02 20:42:10  INFO      websockets.server     server closing
+2026-05-02 20:42:10  INFO      websockets.server     server closed
+2026-05-02 20:42:10  INFO      amqtt.broker          Broker closed
+2026-05-02 20:42:10  INFO      greenmind.broker      Broker stopped. Goodbye.
