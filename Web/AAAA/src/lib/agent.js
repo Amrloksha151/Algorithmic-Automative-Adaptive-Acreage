@@ -5,20 +5,23 @@ const SYSTEM_PROMPT = `You are "Agri", an autonomous AI agent for a high-tech gr
 Your goal is to maintain the ideal environment for the crops.
 The user prefers a COOL environment overall.
 
-You have access to real-time sensor data and can control the following actuators:
-- cooling_fan (PWM 0-100): High value increases cooling and ventilation.
-- ventilation_fan (PWM 0-100): Increases air circulation.
+ACTUATOR BEHAVIOR:
+- cooling_fan (PWM 0-100): High value increases cooling.
+- ventilation_fan (PWM 0-100): Circulates air, decreases humidity, but INCREASES temperature slightly due to motor heat and external air mix.
 - led_strip (PWM 0-100): Grow lights.
 - pump_5v (Digital 0/1): Irrigation pump.
 - mist_maker (Digital 0/1): Increases humidity.
-- pump_12v (PWM 0-100): Main water pump for cooling/irrigation.
+- pump_12v (PWM 0-100): Main water pump.
 
-Analyze the telemetry, compare it with the target ranges, and use the provided tools to adjust the greenhouse state.
-Prioritize cooling if the temperature exceeds the target.
-Always provide a reason for your actions.
-If everything is within range, you can choose to do nothing or make subtle optimizations.`
+TASKS:
+1. "steady_state": You will be given a device and the rate of change (units/min) observed when that device was OFF. 
+   You must decide the steady-state PWM power (0-100) to keep the parameter at its TARGET.
+2. "consultation": A general review of all sensors and current actuator levels. Suggest any subtle optimizations.
 
-export async function runAgriAgent({ provider, keys, telemetry, environment, publishCommand }) {
+Analyze the telemetry, compare it with the targets, and use the provided tools.
+Prioritize cooling if the temperature exceeds the target.`
+
+export async function runAgriAgent({ provider, keys, telemetry, environment, task = 'consultation', context = {}, publishCommand }) {
   const activeKeys = keys[provider] || []
   if (activeKeys.length === 0) {
     throw new Error(`No API keys provided for ${provider}`)
@@ -28,21 +31,20 @@ export async function runAgriAgent({ provider, keys, telemetry, environment, pub
   for (const key of activeKeys) {
     try {
       if (provider === 'google') {
-        return await runGoogleAgent(key, telemetry, environment, publishCommand)
+        return await runGoogleAgent(key, telemetry, environment, task, context, publishCommand)
       } else {
-        return await runOpenAIAgent(key, telemetry, environment, publishCommand)
+        return await runOpenAIAgent(key, telemetry, environment, task, context, publishCommand)
       }
     } catch (err) {
       console.error(`Agent execution failed with key for ${provider}:`, err)
       lastError = err
-      // Continue to next key
     }
   }
 
   throw new Error(`All API keys for ${provider} failed. Last error: ${lastError?.message}`)
 }
 
-async function runGoogleAgent(apiKey, telemetry, environment, publishCommand) {
+async function runGoogleAgent(apiKey, telemetry, environment, task, context, publishCommand) {
   const genAI = new GoogleGenAI({ apiKey })
   const model = genAI.getGenerativeModel({
     model: 'gemini-1.5-flash',
@@ -54,13 +56,13 @@ async function runGoogleAgent(apiKey, telemetry, environment, publishCommand) {
       functionDeclarations: [
         {
           name: 'update_actuator',
-          description: 'Adjust a greenhouse actuator (fan, pump, light, etc.)',
+          description: 'Adjust a greenhouse actuator',
           parameters: {
             type: 'object',
             properties: {
-              device: { type: 'string', description: 'The device ID (e.g., cooling_fan, pump_5v)' },
-              value: { type: 'number', description: 'The value to set (0-100 for PWM, 0 or 1 for Digital)' },
-              reason: { type: 'string', description: 'Detailed reason for this adjustment' },
+              device: { type: 'string' },
+              value: { type: 'number' },
+              reason: { type: 'string' },
             },
             required: ['device', 'value', 'reason'],
           },
@@ -69,14 +71,18 @@ async function runGoogleAgent(apiKey, telemetry, environment, publishCommand) {
     },
   ]
 
-  const chat = model.startChat({
-    tools,
-    history: [],
-  })
+  const chat = model.startChat({ tools, history: [] })
 
-  const prompt = `Current Telemetry: ${JSON.stringify(telemetry)}
+  let prompt = `Current Telemetry: ${JSON.stringify(telemetry)}
 Environment Targets: ${JSON.stringify(environment)}
-Please review the state and take necessary actions.`
+Task: ${task}
+`
+  if (task === 'steady_state') {
+    prompt += `Context: Analyzing ${context.device}. Observed rate of change while OFF: ${context.rateOfChange.toFixed(4)} units/min. 
+    Determine the power level to maintain the target.`
+  } else {
+    prompt += `Please review the state and optimize conditions.`
+  }
 
   const result = await chat.sendMessage(prompt)
   const response = await result.response
@@ -93,13 +99,10 @@ Please review the state and take necessary actions.`
     }
   }
 
-  return {
-    text: response.text(),
-    actions,
-  }
+  return { text: response.text(), actions }
 }
 
-async function runOpenAIAgent(apiKey, telemetry, environment, publishCommand) {
+async function runOpenAIAgent(apiKey, telemetry, environment, task, context, publishCommand) {
   const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
 
   const tools = [
@@ -121,11 +124,16 @@ async function runOpenAIAgent(apiKey, telemetry, environment, publishCommand) {
     },
   ]
 
+  let userContent = `Current Telemetry: ${JSON.stringify(telemetry)}\nEnvironment Targets: ${JSON.stringify(environment)}\nTask: ${task}\n`
+  if (task === 'steady_state') {
+    userContent += `Context: Analyzing ${context.device}. Rate of change while OFF: ${context.rateOfChange.toFixed(4)} units/min.`
+  }
+
   const response = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: `Current Telemetry: ${JSON.stringify(telemetry)}\nEnvironment Targets: ${JSON.stringify(environment)}` },
+      { role: 'user', content: userContent },
     ],
     tools,
   })
@@ -143,8 +151,5 @@ async function runOpenAIAgent(apiKey, telemetry, environment, publishCommand) {
     }
   }
 
-  return {
-    text: message.content || 'Adjustments made based on current conditions.',
-    actions,
-  }
+  return { text: message.content || 'Analysis complete.', actions }
 }

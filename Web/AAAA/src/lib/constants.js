@@ -58,10 +58,10 @@ export const sensorMeta = {
 }
 
 export const sensorDefaults = [
-  { key: 'temperature', value: 24.6, min: 15, max: 25, delta: 0.4, status: 'warn', envMin: 20, envMax: 24 },
-  { key: 'humidity', value: 66, min: 50, max: 75, delta: -1.2, status: 'ok', envMin: 60, envMax: 72 },
-  { key: 'soil', value: 58, min: 40, max: 75, delta: 1.8, status: 'ok', envMin: 55, envMax: 68 },
-  { key: 'light', value: 17.3, min: 15, max: 20, delta: -0.5, status: 'warn', envMin: 16, envMax: 18 },
+  { key: 'temperature', value: 24.6, min: 15, max: 25, target: 20, delta: 0.4, status: 'warn', envMin: 20, envMax: 24 },
+  { key: 'humidity', value: 66, min: 50, max: 75, target: 65, delta: -1.2, status: 'ok', envMin: 60, envMax: 72 },
+  { key: 'soil', value: 58, min: 40, max: 75, target: 60, delta: 1.8, status: 'ok', envMin: 55, envMax: 68 },
+  { key: 'light', value: 17.3, min: 15, max: 20, target: 18, delta: -0.5, status: 'warn', envMin: 16, envMax: 18 },
 ]
 
 export const greenhousePresets = [
@@ -71,18 +71,57 @@ export const greenhousePresets = [
 ]
 
 export const envPresets = [
-  { id: 'tomatoes', name: 'Tomatoes', emoji: '🍅', temp: [20, 25], humidity: [60, 70], soil: [55, 70], light: [18, 20], photoperiod: 14 },
-  { id: 'lettuce', name: 'Lettuce', emoji: '🥬', temp: [15, 20], humidity: [60, 75], soil: [50, 65], light: [15, 17], photoperiod: 14 },
-  { id: 'herbs', name: 'Herbs', emoji: '🌿', temp: [18, 24], humidity: [55, 70], soil: [45, 65], light: [16, 18], photoperiod: 14 },
+  { 
+    id: 'tomatoes', 
+    name: 'Tomatoes', 
+    emoji: '🍅', 
+    temp: [20, 25], 
+    tempTarget: 22,
+    humidity: [60, 70], 
+    humidityTarget: 65,
+    soil: [55, 70], 
+    soilTarget: 60,
+    light: [18, 20], 
+    lightTarget: 19,
+    photoperiod: 14 
+  },
+  { 
+    id: 'lettuce', 
+    name: 'Lettuce', 
+    emoji: '🥬', 
+    temp: [15, 20], 
+    tempTarget: 17,
+    humidity: [60, 75], 
+    humidityTarget: 68,
+    soil: [50, 65], 
+    soilTarget: 55,
+    light: [15, 17], 
+    lightTarget: 16,
+    photoperiod: 14 
+  },
+  { 
+    id: 'herbs', 
+    name: 'Herbs', 
+    emoji: '🌿', 
+    temp: [18, 24], 
+    tempTarget: 21,
+    humidity: [55, 70], 
+    humidityTarget: 62,
+    soil: [45, 65], 
+    soilTarget: 50,
+    light: [16, 18], 
+    lightTarget: 17,
+    photoperiod: 14 
+  },
 ]
 
 export const initialEnvironment = {
   activePreset: 'tomatoes',
   plantDescription: 'Warm-season fruiting crop with high light demand.',
-  temperature: { min: 20, max: 25 },
-  humidity: { min: 60, max: 70 },
-  soil: { min: 55, max: 70 },
-  light: { min: 18, max: 20 },
+  temperature: { min: 20, max: 25, target: 22 },
+  humidity: { min: 60, max: 70, target: 65 },
+  soil: { min: 55, max: 70, target: 60 },
+  light: { min: 18, max: 20, target: 19 },
   photoperiod: 14,
   plantedArea: 4,
 }

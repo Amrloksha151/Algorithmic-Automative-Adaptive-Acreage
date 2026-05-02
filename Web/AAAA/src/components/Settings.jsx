@@ -48,9 +48,10 @@ function RangeControl({ label, value, onChange, unit }) {
       <div className="section-heading compact"><h2>{label}</h2></div>
       <div className="range-inputs">
         <label>Min <input type="number" value={value.min} onChange={(e) => onChange({ ...value, min: Number(e.target.value) })} /></label>
+        <label>Target <input type="number" value={value.target} onChange={(e) => onChange({ ...value, target: Number(e.target.value) })} /></label>
         <label>Max <input type="number" value={value.max} onChange={(e) => onChange({ ...value, max: Number(e.target.value) })} /></label>
       </div>
-      <small>{value.min}–{value.max} {unit}</small>
+      <small>Target: {value.target} {unit} (Safe: {value.min}–{value.max})</small>
     </div>
   )
 }
@@ -77,10 +78,10 @@ export function SettingsPage({
       ...environment,
       activePreset: preset.id,
       plantDescription: `${preset.name} profile.`,
-      temperature: { min: preset.temp[0], max: preset.temp[1] },
-      humidity: { min: preset.humidity[0], max: preset.humidity[1] },
-      soil: { min: preset.soil[0], max: preset.soil[1] },
-      light: { min: preset.light[0], max: preset.light[1] },
+      temperature: { min: preset.temp[0], max: preset.temp[1], target: preset.tempTarget },
+      humidity: { min: preset.humidity[0], max: preset.humidity[1], target: preset.humidityTarget },
+      soil: { min: preset.soil[0], max: preset.soil[1], target: preset.soilTarget },
+      light: { min: preset.light[0], max: preset.light[1], target: preset.lightTarget },
       photoperiod: preset.photoperiod,
     })
   }
