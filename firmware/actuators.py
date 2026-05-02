@@ -50,7 +50,7 @@ ACTUATORS = {
     "mist_maker": {
         "pin":    17,
         "type":   "digital",
-        "invert": True,     # relay module: LOW = ON
+        "invert": False,
     },
 
     "led_strip": {

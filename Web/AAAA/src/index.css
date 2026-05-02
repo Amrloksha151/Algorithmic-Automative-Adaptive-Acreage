@@ -840,6 +840,136 @@ a {
   min-width: 0;
 }
 
+.autopilot-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  transition: all 180ms ease;
+}
+
+.autopilot-toggle.active {
+  background: var(--green-900);
+  border-color: var(--green-500);
+  color: var(--green-300);
+  box-shadow: var(--glow-green);
+}
+
+.agent-summary-card {
+  border-left: 4px solid var(--green-500);
+  padding: 20px;
+}
+
+.agent-text {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.action-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.action-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  background: var(--bg-overlay);
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+
+.action-item strong {
+  color: var(--green-300);
+}
+
+.action-item span {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.provider-select {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.provider-select select {
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.key-management {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.key-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.key-input-row input {
+  flex: 1;
+}
+
+.key-input-row button {
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--green-700);
+  color: white;
+  border: none;
+}
+
+.key-list {
+  display: grid;
+  gap: 8px;
+}
+
+.key-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+}
+
+.key-item code {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.key-item button {
+  color: var(--status-danger);
+  background: transparent;
+  border: none;
+  padding: 4px;
+}
+
+.error-note {
+  color: var(--status-warn);
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
 @keyframes spin {
   from {
     transform: rotate(0deg);
