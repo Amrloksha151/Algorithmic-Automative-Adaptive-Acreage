@@ -40,8 +40,7 @@ import { OnboardingFlow } from './components/Onboarding'
 function App() {
   const navigate = useNavigate()
   const mqttClientRef = useRef(null)
-  const autopilotTimerRef = useRef(null)
-
+  
   // -- UI State --
   const [onboardingVisible, setOnboardingVisible] = useState(() => 
     readStoredValue([storageKeys.onboarding, legacyStorageKeys.onboarding]) !== 'true'
@@ -59,23 +58,27 @@ function App() {
   const [toggleValues, setToggleValues] = useState(toggleGroups)
   
   const latestTelemetryRef = useRef(null)
-  useEffect(() => {
-    latestTelemetryRef.current = telemetryHistory[telemetryHistory.length - 1]
-  }, [telemetryHistory])
 
   // -- Settings State --
   const [environment, setEnvironment] = useState(() => 
     safeReadJson([storageKeys.environment, legacyStorageKeys.environment], initialEnvironment)
   )
+  const environmentRef = useRef(environment)
+  useEffect(() => { environmentRef.current = environment }, [environment])
+
   const [mqttSettings, setMqttSettings] = useState(() => 
     safeReadJson([storageKeys.mqtt, legacyStorageKeys.mqtt], defaultMqttSettings)
   )
   const [mqttDraft, setMqttDraft] = useState(() => 
     safeReadJson([storageKeys.mqtt, legacyStorageKeys.mqtt], defaultMqttSettings)
   )
+  
   const [aiSettings, setAiSettings] = useState(() => 
     safeReadJson([storageKeys.ai, legacyStorageKeys.ai], defaultAiSettings)
   )
+  const aiSettingsRef = useRef(aiSettings)
+  useEffect(() => { aiSettingsRef.current = aiSettings }, [aiSettings])
+
   const [databaseSettings, setDatabaseSettings] = useState(() => 
     safeReadJson([storageKeys.database, legacyStorageKeys.database], defaultDatabaseSettings)
   )
@@ -87,6 +90,24 @@ function App() {
   // -- AI Agent State --
   const [agentOutput, setAgentOutput] = useState(null)
   const [isAgentRunning, setIsAgentRunning] = useState(false)
+
+  // -- Autopilot State & Refs --
+  const [autopilotStatus, setAutopilotStatus] = useState({
+    temperature: { phase: 'idle', power: 0 },
+    ventilation: { phase: 'idle', power: 0 },
+    humidity: { phase: 'idle', power: 0 },
+    soil: { phase: 'idle', power: 0 },
+    light: { phase: 'idle', power: 0, gain: 0, lastCalibration: 0 }
+  })
+  const autopilotStatusRef = useRef(autopilotStatus)
+  useEffect(() => { autopilotStatusRef.current = autopilotStatus }, [autopilotStatus])
+
+  const analysisDataRef = useRef({
+    temperature: { startTime: null, startValue: null },
+    ventilation: { startTime: null, startValue: null },
+    light: { ambientBaseline: null }
+  })
+  const lastPresetRef = useRef(environment.activePreset)
 
   // 1. Persistence Effects
   useEffect(() => { window.localStorage.setItem(storageKeys.environment, JSON.stringify(environment)) }, [environment])
@@ -115,7 +136,7 @@ function App() {
     const client = mqttClientRef.current
     if (!client || connectionState !== 'connected') return false
 
-    const topicPrefix = mqttSettings.topicPrefix?.trim() || 'greenhouse'
+    const topicPrefix = mqttSettings.topicPrefix?.trim() || 'greenhouse-19207'
     const command = {
       device,
       value,
@@ -127,6 +148,7 @@ function App() {
     client.publish(getCommandTopic(topicPrefix), JSON.stringify(command))
     if (isDbReady()) logCommand(command)
     setLastSyncAt(new Date().toISOString())
+    console.log(`[MQTT] Published: ${device} = ${value} (${reason})`)
     return true
   }, [connectionState, mqttSettings.topicPrefix])
 
@@ -137,19 +159,17 @@ function App() {
       return () => window.clearTimeout(timer)
     }
 
-    // Singleton check: If we already have a client, don't start another
     if (mqttClientRef.current) return
 
     let isActive = true
     const brokerUrl = brokerUrlFromSettings(mqttSettings)
-    const topicPrefix = mqttSettings.topicPrefix?.trim() || 'greenhouse'
+    const topicPrefix = mqttSettings.topicPrefix?.trim() || 'greenhouse-19207'
     const topics = {
       sensors: getSensorTopic(topicPrefix),
       actuators: getActuatorStateTopic(topicPrefix),
       status: getStatusTopic(topicPrefix),
     }
 
-    // Settling delay: wait for browser/React to stabilize before connecting
     const connectTimer = window.setTimeout(() => {
       if (!isActive) return
       setConnectionState('connecting')
@@ -172,9 +192,14 @@ function App() {
           soil: snapshot.soil,
           light: snapshot.light,
         }
+        
+        // Concurrent access update
+        latestTelemetryRef.current = telemetry
+        
         if (isDbReady()) logTelemetry(telemetry)
         setTelemetryHistory(prev => [...prev.slice(-49), { ...telemetry, timestamp: Date.now() }])
         setSensorValues(prev => prev.map(s => snapshot[s.key] != null ? { ...s, value: Number(snapshot[s.key]) } : s))
+        
         if (snapshot.actuators) {
           setPwmValues(prev => prev.map(c => typeof snapshot.actuators[c.device] === 'number' ? { ...c, value: snapshot.actuators[c.device] } : c))
           setToggleValues(prev => prev.map(c => typeof snapshot.actuators[c.device] === 'number' ? { ...c, on: Boolean(snapshot.actuators[c.device]) } : c))
@@ -213,7 +238,7 @@ function App() {
     }
   }, [mqttSettings])
 
-  // 5. AI Agent Logic
+  // 5. AI Agent Manual Trigger
   const handleAskAgri = async () => {
     if (isAgentRunning) return
     setIsAgentRunning(true)
@@ -234,46 +259,33 @@ function App() {
     }
   }
 
-  // -- Autopilot State Machine --
-  const [autopilotStatus, setAutopilotStatus] = useState({
-    temperature: { phase: 'idle', power: 0 },
-    ventilation: { phase: 'idle', power: 0 },
-    humidity: { phase: 'idle', power: 0 },
-    soil: { phase: 'idle', power: 0 }
-  })
-  const autopilotStatusRef = useRef(autopilotStatus)
-  useEffect(() => { autopilotStatusRef.current = autopilotStatus }, [autopilotStatus])
-
-  const analysisDataRef = useRef({
-    temperature: { startTime: null, startValue: null },
-    ventilation: { startTime: null, startValue: null }
-  })
-  const lastPresetRef = useRef(environment.activePreset)
-
   // 6. Concurrent Autopilot Engine
   useEffect(() => {
     let isActive = true
     if (!aiSettings.autopilotActive || connectionState !== 'connected') return
 
-    // Trigger recovery on preset switch
+    // Trigger full recovery on preset switch
     if (lastPresetRef.current !== environment.activePreset) {
       lastPresetRef.current = environment.activePreset
-      setAutopilotStatus({
+      console.log('[Autopilot] Preset switch detected, triggering recovery for all systems.')
+      setAutopilotStatus(prev => ({
+        ...prev,
         temperature: { phase: 'recovery', power: 100 },
         ventilation: { phase: 'recovery', power: 100 },
-        humidity: { phase: 'recovery', power: 1 },
-        soil: { phase: 'recovery', power: 1 }
-      })
-      publishCommand('cooling_fan', 100, 'Preset switch recovery', 'autopilot')
-      publishCommand('ventilation_fan', 100, 'Preset switch recovery', 'autopilot')
-      publishCommand('mist_maker', 1, 'Preset switch recovery', 'autopilot')
-      publishCommand('pump_5v', 1, 'Preset switch recovery', 'autopilot')
+        humidity: { phase: 'idle', power: 0 },
+        soil: { phase: 'idle', power: 0 },
+        light: { phase: 'idle', power: 0, gain: 0, lastCalibration: 0 }
+      }))
+      publishCommand('cooling_fan', 100, 'Preset recovery', 'autopilot')
+      publishCommand('ventilation_fan', 100, 'Preset recovery', 'autopilot')
     }
 
-    // A. Reactive Cycle (Concurrent Async Loop)
     const reactiveLoop = async () => {
       while (isActive) {
         const latest = latestTelemetryRef.current
+        const currentEnv = environmentRef.current
+        const currentAi = aiSettingsRef.current
+
         if (!latest) {
           await new Promise(r => setTimeout(r, 1000))
           continue
@@ -283,12 +295,18 @@ function App() {
         let nextStatus = { ...currentStatus }
         let changed = false
 
+        console.log('[Autopilot] Reactive Cycle Check', { 
+            temp: latest.temperature, 
+            target: currentEnv.temperature.target,
+            phase: currentStatus.temperature.phase 
+        })
+
         // --- TEMPERATURE ---
-        if (latest.temperature > environment.temperature.max && (currentStatus.temperature.phase === 'idle' || currentStatus.temperature.phase === 'steady')) {
+        if (latest.temperature > currentEnv.temperature.max && (currentStatus.temperature.phase === 'idle' || currentStatus.temperature.phase === 'steady')) {
           nextStatus.temperature = { phase: 'recovery', power: 100 }
           publishCommand('cooling_fan', 100, 'Over temperature limit', 'autopilot')
           changed = true
-        } else if (currentStatus.temperature.phase === 'recovery' && latest.temperature <= environment.temperature.target) {
+        } else if (currentStatus.temperature.phase === 'recovery' && latest.temperature <= currentEnv.temperature.target) {
           nextStatus.temperature = { phase: 'analysis', power: 0 }
           analysisDataRef.current.temperature = { startTime: Date.now(), startValue: latest.temperature }
           publishCommand('cooling_fan', 0, 'Target reached, entering analysis', 'autopilot')
@@ -297,11 +315,12 @@ function App() {
           const elapsed = (Date.now() - analysisDataRef.current.temperature.startTime) / 1000
           if (elapsed >= 20) {
             const rate = (latest.temperature - analysisDataRef.current.temperature.startValue) / (elapsed / 60)
+            console.log(`[Autopilot] Temp Analysis Complete. Rate: ${rate.toFixed(4)} °C/min`)
             nextStatus.temperature = { phase: 'requesting_ai', power: 0 }
             setAutopilotStatus(prev => ({ ...prev, temperature: { phase: 'requesting_ai', power: 0 } }))
             try {
               const result = await runAgriAgent({
-                provider: aiSettings.provider, keys: aiSettings.keys, telemetry: latest, environment,
+                provider: currentAi.provider, keys: currentAi.keys, telemetry: latest, environment: currentEnv,
                 task: 'steady_state', context: { device: 'cooling_fan', rateOfChange: rate },
                 publishCommand: (d, v, r) => publishCommand(d, v, r, 'autopilot')
               })
@@ -309,18 +328,23 @@ function App() {
               const aiAction = result.actions.find(a => a.device === 'cooling_fan')
               setAutopilotStatus(prev => ({ ...prev, temperature: { phase: 'steady', power: aiAction ? aiAction.value : 0 } }))
             } catch (err) {
-              console.error('AI Error (Temp):', err)
-              setAutopilotStatus(prev => ({ ...prev, temperature: { phase: 'idle', power: 0 } }))
+              console.warn('[Autopilot] AI Quota/Error, using heuristic fallback for Temp')
+              const fallbackPower = Math.max(20, Math.min(100, Math.round(70 + (rate * 10))))
+              publishCommand('cooling_fan', fallbackPower, 'AI Fallback (Heuristic)', 'autopilot')
+              setAutopilotStatus(prev => ({ ...prev, temperature: { phase: 'steady', power: fallbackPower } }))
             }
           }
         }
 
-        // --- VENTILATION ---
-        if (latest.temperature < environment.temperature.min && (currentStatus.ventilation.phase === 'idle' || currentStatus.ventilation.phase === 'steady')) {
+        // --- VENTILATION (Interlocked with Humidity) ---
+        const humidityTarget = currentEnv.humidity.target
+        const isHumidityLow = latest.humidity < humidityTarget
+        
+        if (latest.temperature < currentEnv.temperature.min && (currentStatus.ventilation.phase === 'idle' || currentStatus.ventilation.phase === 'steady')) {
           nextStatus.ventilation = { phase: 'recovery', power: 100 }
           publishCommand('ventilation_fan', 100, 'Under temperature limit', 'autopilot')
           changed = true
-        } else if (currentStatus.ventilation.phase === 'recovery' && latest.temperature >= environment.temperature.target) {
+        } else if (currentStatus.ventilation.phase === 'recovery' && latest.temperature >= currentEnv.temperature.target) {
           nextStatus.ventilation = { phase: 'analysis', power: 0 }
           analysisDataRef.current.ventilation = { startTime: Date.now(), startValue: latest.temperature }
           publishCommand('ventilation_fan', 0, 'Target reached, entering analysis', 'autopilot')
@@ -333,35 +357,80 @@ function App() {
             setAutopilotStatus(prev => ({ ...prev, ventilation: { phase: 'requesting_ai', power: 0 } }))
             try {
               const result = await runAgriAgent({
-                provider: aiSettings.provider, keys: aiSettings.keys, telemetry: latest, environment,
+                provider: currentAi.provider, keys: currentAi.keys, telemetry: latest, environment: currentEnv,
                 task: 'steady_state', context: { device: 'ventilation_fan', rateOfChange: rate },
                 publishCommand: (d, v, r) => publishCommand(d, v, r, 'autopilot')
               })
               setAgentOutput(result)
               const aiAction = result.actions.find(a => a.device === 'ventilation_fan')
-              setAutopilotStatus(prev => ({ ...prev, ventilation: { phase: 'steady', power: aiAction ? aiAction.value : 0 } }))
+              const power = isHumidityLow ? Math.min(aiAction ? aiAction.value : 0, 20) : (aiAction ? aiAction.value : 0)
+              setAutopilotStatus(prev => ({ ...prev, ventilation: { phase: 'steady', power } }))
             } catch (err) {
-              setAutopilotStatus(prev => ({ ...prev, ventilation: { phase: 'idle', power: 0 } }))
+              const fallbackPower = isHumidityLow ? 0 : 40
+              publishCommand('ventilation_fan', fallbackPower, 'AI Fallback (Interlock)', 'autopilot')
+              setAutopilotStatus(prev => ({ ...prev, ventilation: { phase: 'steady', power: fallbackPower } }))
             }
           }
         }
 
+        // --- LIGHT INTENSITY (Calibration Method) ---
+        const hoursSinceCalibration = (Date.now() - currentStatus.light.lastCalibration) / 3600000
+        if (currentStatus.light.phase === 'idle' || hoursSinceCalibration >= 1.0) {
+           console.log('[Autopilot] Starting Light Calibration Cycle...')
+           nextStatus.light = { ...currentStatus.light, phase: 'measuring_ambient' }
+           analysisDataRef.current.light.ambientBaseline = latest.light
+           publishCommand('led_strip', 100, 'Calibration Start', 'autopilot')
+           changed = true
+        } else if (currentStatus.light.phase === 'measuring_ambient') {
+           // We set power to 100 in previous cycle. Now measure the gain.
+           const intensityAt100 = latest.light
+           const ambient = analysisDataRef.current.light.ambientBaseline
+           const gain = Math.max(0.1, (intensityAt100 - ambient) / 100) // Increase per 1% PWM
+           console.log(`[Autopilot] Light Gain Calculated: ${gain.toFixed(2)} units/%`)
+           
+           nextStatus.light = { 
+             phase: 'steady', 
+             gain, 
+             lastCalibration: Date.now(),
+             power: 0 
+           }
+           
+           // Calculate required power to hit target from current ambient
+           const requiredPower = Math.max(0, Math.min(100, Math.round((currentEnv.light.target - ambient) / gain)))
+           publishCommand('led_strip', requiredPower, 'Calibration Applied', 'autopilot')
+           nextStatus.light.power = requiredPower
+           changed = true
+        } else if (currentStatus.light.phase === 'steady') {
+           // Continously adjust for ambient fluctuations using measured gain
+           // We can't measure ambient while ON, so we assume gain is constant and adjust from current reading
+           const error = currentEnv.light.target - latest.light
+           if (Math.abs(error) > 1.0) {
+             const adj = error / currentStatus.light.gain
+             const nextPower = Math.max(0, Math.min(100, Math.round(currentStatus.light.power + adj)))
+             if (nextPower !== currentStatus.light.power) {
+               publishCommand('led_strip', nextPower, 'Light tracking adjustment', 'autopilot')
+               nextStatus.light.power = nextPower
+               changed = true
+             }
+           }
+        }
+
         // --- HUMIDITY & SOIL ---
-        if (latest.humidity < environment.humidity.min && currentStatus.humidity.power === 0) {
+        if (latest.humidity < currentEnv.humidity.min && currentStatus.humidity.power === 0) {
           nextStatus.humidity = { phase: 'recovering', power: 1 }
           publishCommand('mist_maker', 1, 'Below humidity limit', 'autopilot')
           changed = true
-        } else if (latest.humidity >= environment.humidity.target && currentStatus.humidity.power === 1) {
+        } else if (latest.humidity >= currentEnv.humidity.target && currentStatus.humidity.power === 1) {
           nextStatus.humidity = { phase: 'idle', power: 0 }
           publishCommand('mist_maker', 0, 'Humidity target reached', 'autopilot')
           changed = true
         }
 
-        if (latest.soil < environment.soil.min && currentStatus.soil.power === 0) {
+        if (latest.soil < currentEnv.soil.min && currentStatus.soil.power === 0) {
           nextStatus.soil = { phase: 'recovering', power: 1 }
           publishCommand('pump_5v', 1, 'Below soil moisture limit', 'autopilot')
           changed = true
-        } else if (latest.soil >= environment.soil.target && currentStatus.soil.power === 1) {
+        } else if (latest.soil >= currentEnv.soil.target && currentStatus.soil.power === 1) {
           nextStatus.soil = { phase: 'idle', power: 0 }
           publishCommand('pump_5v', 0, 'Soil target reached', 'autopilot')
           changed = true
@@ -372,20 +441,21 @@ function App() {
       }
     }
 
-    // B. Consultation Cycle
     const consultationLoop = async () => {
       while (isActive) {
-        await new Promise(r => setTimeout(r, 600000)) // Wait 10 mins first
+        await new Promise(r => setTimeout(r, 600000)) // 10 mins
         if (!isActive) break
         const latest = latestTelemetryRef.current
+        const currentEnv = environmentRef.current
+        const currentAi = aiSettingsRef.current
         if (latest) {
           try {
             const result = await runAgriAgent({
-              provider: aiSettings.provider, keys: aiSettings.keys, telemetry: latest, environment,
+              provider: currentAi.provider, keys: currentAi.keys, telemetry: latest, environment: currentEnv,
               task: 'consultation', publishCommand: (d, v, r) => publishCommand(d, v, r, 'autopilot')
             })
             setAgentOutput(result)
-          } catch (err) { console.error('Consultation AI Error:', err) }
+          } catch (err) { console.error('[Autopilot] Consultation AI Error:', err) }
         }
       }
     }
@@ -394,7 +464,7 @@ function App() {
     consultationLoop()
 
     return () => { isActive = false }
-  }, [aiSettings.autopilotActive, connectionState, environment, aiSettings.keys, aiSettings.provider, publishCommand])
+  }, [aiSettings.autopilotActive, connectionState, publishCommand])
 
   // 7. DB Initialization Handler
   const handleInitDB = async () => {

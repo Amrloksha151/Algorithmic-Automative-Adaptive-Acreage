@@ -23,7 +23,7 @@ export const defaultMqttSettings = {
   host: '192.168.0.49',
   port: '8883',
   path: '/mqtt',
-  topicPrefix: 'greenhouse',
+  topicPrefix: 'greenhouse-19207',
   username: '',
   password: '',
 }
