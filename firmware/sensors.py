@@ -97,17 +97,39 @@ def read_soil() -> dict:
 
 def read_ldr() -> dict:
     """
-    Read light intensity from LDR module AO pin.
-    Returns illuminance in lux.
+    Estimate PAR from the LDR module AO pin.
+
+    The ADC reading is still converted to an illuminance estimate first, but the
+    returned values are expressed as photosynthetic metrics:
+    - light_instant: estimated PPFD in umol/m^2/s
+    - light: estimated daily light integral in mol/m^2/day
+    - light_area_mol: daily PAR for the planted area in mol/day
+
+    This is an approximation because lux-to-PAR depends on spectrum. The
+    coefficient below is tuned for mixed daylight and white LED light.
     The module's built-in voltage divider is already on-board —
     no external resistor needed.
 
     Returns:
         {
-          "light":     float  (lux)
-          "light_raw": int    raw ADC value for diagnostics
+          "light":          float  estimated DLI in mol/m^2/day
+          "light_instant":   float  estimated PPFD in umol/m^2/s
+          "light_lux":      float  intermediate illuminance estimate in lux
+          "light_area_mol":  float  estimated daily PAR for 0.25 m^2 in mol/day
+          "light_raw":      int    raw ADC value for diagnostics
         }
     """
+    import time
+
+    if not hasattr(read_ldr, "_state"):
+        read_ldr._state = {
+            "last_ms": None,
+            "window_start_ms": None,
+            "dli_mol_m2": 0.0,
+        }
+
+    state = read_ldr._state
+
     raw = _ldr_adc.read()
     adc = max(0, min(4095, raw))
 
@@ -123,8 +145,59 @@ def read_ldr() -> dict:
         lux = max(LDR_MIN_LUX, min(LDR_MAX_LUX, lux))
 
     lux = round(lux, 1)
-    _last["light"] = lux
-    return {"light": lux, "light_raw": raw}
+
+    # Approximate lux-to-PPFD conversion for mixed daylight + white LED.
+    # Typical broad-spectrum white light is about 55-60 lux per umol/m^2/s.
+    # Use a conservative midpoint and keep it local so it can be tuned later.
+    ppfd = lux / 58.0 if lux > 0 else 0.0
+
+    now_ms = time.ticks_ms()
+    last_ms = state["last_ms"]
+    window_start_ms = state["window_start_ms"]
+
+    if window_start_ms is None:
+        state["window_start_ms"] = now_ms
+        window_start_ms = now_ms
+
+    elapsed_ms = time.ticks_diff(now_ms, window_start_ms)
+    if elapsed_ms < 0:
+        elapsed_ms = 0
+
+    if elapsed_ms >= 86400000:
+        state["dli_mol_m2"] = 0.0
+        state["window_start_ms"] = now_ms
+        state["last_ms"] = now_ms
+        _last["light"] = 0.0
+        return {
+            "light": 0.0,
+            "light_instant": round(ppfd, 2),
+            "light_lux": lux,
+            "light_area_mol": 0.0,
+            "light_raw": raw,
+        }
+
+    if last_ms is None:
+        delta_ms = 0
+    else:
+        delta_ms = time.ticks_diff(now_ms, last_ms)
+        if delta_ms < 0:
+            delta_ms = 0
+
+    state["dli_mol_m2"] += ppfd * (delta_ms / 1000.0) / 1000000.0
+    state["last_ms"] = now_ms
+
+    dli_mol_m2 = round(state["dli_mol_m2"], 4)
+    area_m2 = 0.25
+    light_area_mol = round(dli_mol_m2 * area_m2, 4)
+
+    _last["light"] = dli_mol_m2
+    return {
+        "light": dli_mol_m2,
+        "light_instant": round(ppfd, 2),
+        "light_lux": lux,
+        "light_area_mol": light_area_mol,
+        "light_raw": raw,
+    }
 
 
 # ─────────────────────────────────────────────────────────────

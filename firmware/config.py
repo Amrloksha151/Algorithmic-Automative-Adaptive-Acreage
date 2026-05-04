@@ -4,11 +4,11 @@
 # ─────────────────────────────────────────────────────────────
 
 # ── WiFi ──────────────────────────────────────────────────────
-WIFI_SSID     = "AAAA"
-WIFI_PASSWORD = "AAAA@19207"
+WIFI_SSID     = "Alhamdulilah"
+WIFI_PASSWORD = "HAha@999"
 
 # ── MQTT broker ───────────────────────────────────────────────
-MQTT_BROKER   = "192.168.1.3"   # or your local broker IP
+MQTT_BROKER   = "192.168.0.49"   # or your local broker IP
 MQTT_PORT     = 1883
 MQTT_CLIENT_ID= "AAAA-esp32s3"
 
